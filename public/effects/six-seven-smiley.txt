@@ -1,0 +1,5 @@
+Created with the built-in image_gen tool from the user-supplied reference.
+Asset: six-seven-smiley.png (1245 x 1263, transparent background).
+
+Final prompt:
+Use case: precise-object-edit. Asset type: transparent PNG overlay for website hover animation. Input image is the edit target. Remove ONLY the black digits 6 and 7, and remove the white/off-white background to true transparency. Preserve exactly the same yellow 3D sleepy smiley character: identical face, eyebrows, eyes, expression, round body, white gloves with empty upward-facing palms, olive shoes, original pose and relative positions. Keep original full square canvas framing and character position: the left empty hand at about x=105 y=190 and right empty hand at x=248 y=184 on the 337x342 reference, so separate animated digits can sit above them. Do not recenter or crop tightly. No numerals, letters, new objects, shadows outside the character, or watermark.

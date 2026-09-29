@@ -6,6 +6,8 @@ import Jar from './components/Jar'
 import CustomCursor from './components/CustomCursor'
 import CVPanel from './components/CVPanel'
 import ProjectView from './components/ProjectView'
+import NikaTitle from './components/NikaTitle'
+import SixSevenEffect from './components/SixSevenEffect'
 
 type Flight = { project: Project; rect: DOMRect; phase: 'ready' | 'out' | 'return-ready' | 'return' }
 type JarEffect = { id: string; phase: 'shake' | 'shatter' | 'shattered' | 'reassemble' }
@@ -25,6 +27,9 @@ export default function App() {
   const [jarEffect, setJarEffect] = useState<JarEffect | null>(null)
   const [erasing, setErasing] = useState(false)
   const [inverted, setInverted] = useState(false)
+  const [pairHovered, setPairHovered] = useState(false)
+  const [pairDigitsAway, setPairDigitsAway] = useState(false)
+  const pairLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [revealOrigin, setRevealOrigin] = useState({ x: '50%', y: '50%', radius: '150vmax' })
   const [numberPositions, setNumberPositions] = useState<{ number: string; x: number; y: number }[]>([])
   const [reducedMotion, setReducedMotion] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
@@ -34,6 +39,17 @@ export default function App() {
   const closingRef = useRef(false)
   const lastRect = useRef<DOMRect | null>(null)
   const onEraser = useCallback((active: boolean) => setErasing(active), [])
+  const onPairHover = useCallback((active: boolean) => {
+    if (pairLeaveTimer.current) clearTimeout(pairLeaveTimer.current)
+    if (active) setPairHovered(true)
+    else pairLeaveTimer.current = setTimeout(() => setPairHovered(false), 160)
+  }, [])
+  const pairActive = pairHovered && !cvOpen && !activeProject && !flight && !jarEffect
+  useEffect(() => {
+    if (pairActive) { setPairDigitsAway(true); return }
+    const timer = setTimeout(() => setPairDigitsAway(false), reducedMotion ? 0 : 920)
+    return () => clearTimeout(timer)
+  }, [pairActive, reducedMotion])
 
   const startReveal = () => {
     const shell = shellRef.current?.getBoundingClientRect()
@@ -60,7 +76,9 @@ export default function App() {
     if (!shell) return
     const measure = () => {
       const shellRect = shell.getBoundingClientRect()
-      setNumberPositions(Array.from(shell.querySelectorAll<HTMLElement>('.jar-index'), label => {
+      // Only the invisible placement anchors inherit the jars' transforms.
+      // The independent number layer uses these centers in shell coordinates.
+      setNumberPositions(Array.from(shell.querySelectorAll<HTMLElement>('.jar-index-anchor'), label => {
         const rect = label.getBoundingClientRect()
         return {
           number: label.textContent ?? '',
@@ -84,6 +102,7 @@ export default function App() {
     return () => media.removeEventListener('change', change)
   }, [])
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
+  useEffect(() => () => { if (pairLeaveTimer.current) clearTimeout(pairLeaveTimer.current) }, [])
   useEffect(() => { document.body.style.overflow = activeProject || cvOpen ? 'hidden' : ''; return () => { document.body.style.overflow = '' } }, [activeProject, cvOpen])
 
   const later = (fn: () => void, delay: number) => { timers.current.push(setTimeout(fn, delay)) }
@@ -135,18 +154,19 @@ export default function App() {
   } as CSSProperties : undefined
 
   return <>
-    <div ref={shellRef} className={`site-shell${inverted ? ' is-inverted' : ''}`} style={{ '--reveal-x': revealOrigin.x, '--reveal-y': revealOrigin.y, '--reveal-radius': revealOrigin.radius } as CSSProperties}>
+    <div ref={shellRef} className={`site-shell${inverted ? ' is-inverted' : ''}${pairActive || pairDigitsAway ? ' six-seven-active' : ''}`} style={{ '--reveal-x': revealOrigin.x, '--reveal-y': revealOrigin.y, '--reveal-radius': revealOrigin.radius } as CSSProperties}>
       <div className="color-reveal" aria-hidden="true" />
-      <div className="number-reveal" aria-hidden="true">{numberPositions.map(({ number, x, y }) => <span key={number} style={{ left: x, top: y }}>{number}</span>)}</div>
-      <header className="site-header"><span>NIKA®</span><button type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT / CV <span aria-hidden="true">↗</span></button></header>
+      <div className="jar-indices" aria-hidden="true">{numberPositions.map(({ number, x, y }) => <span className="jar-index" key={number} data-jar-number={number} style={{ left: x, top: y }}><span>{number[0]}</span><span className="jar-index-last"><i className="jar-index-baseline" />{number[1]}</span></span>)}</div>
+      <header className="site-header"><button type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT / CV <span aria-hidden="true">↗</span></button></header>
       <section className="home" aria-label="Selected portfolio projects">
         <div className="home-stage">
-          <button ref={titleRef} type="button" className="nika-title" onMouseEnter={startReveal} onMouseLeave={() => setInverted(false)} onFocus={startReveal} onBlur={() => setInverted(false)} onClick={() => setCvOpen(true)} data-interactive="true" aria-label="Open Nika's CV"><span>NIKA</span></button>
-          <div className="jar-scene">{jars.map(jar => <Jar key={jar.id} jar={jar} project={projects.find(p => p.id === jar.projectId)!} effect={jarEffect?.id === jar.projectId ? jarEffect.phase : null} onOpen={openProject} onEraser={onEraser} />)}</div>
+          <NikaTitle titleRef={titleRef} onReveal={startReveal} onConceal={() => setInverted(false)} onOpen={() => setCvOpen(true)} />
+          <div className="jar-scene">{jars.map(jar => <Jar key={jar.id} jar={jar} project={projects.find(p => p.id === jar.projectId)!} effect={jarEffect?.id === jar.projectId ? jarEffect.phase : null} onOpen={openProject} onEraser={onEraser} onPairHover={onPairHover} />)}</div>
         </div>
       </section>
       <footer className="site-footer"><span>© VERONICA CHEREPKO / 2026</span></footer>
     </div>
+    <SixSevenEffect active={pairActive} returning={pairDigitsAway && !pairActive} shellRef={shellRef} />
     <CVPanel open={cvOpen} onClose={() => setCvOpen(false)} />
     {activeProject && <ProjectView project={activeProject} closing={closing} onClose={closeProject} />}
     {flight && <div className={`flight-berry flight-${flight.phase}`} style={flightStyle} aria-hidden="true"><i /></div>}

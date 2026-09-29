@@ -3,7 +3,7 @@ import type { CSSProperties, PointerEvent, RefObject } from 'react'
 import type { JarConfig, Project } from '../data'
 
 type Stroke = { x: number; y: number }
-type JarProps = { jar: JarConfig; project: Project; effect: 'shake' | 'shatter' | 'shattered' | 'reassemble' | null; onOpen: (project: Project, berry: DOMRect) => void; onEraser: (active: boolean) => void }
+type JarProps = { jar: JarConfig; project: Project; effect: 'shake' | 'shatter' | 'shattered' | 'reassemble' | null; onOpen: (project: Project, berry: DOMRect) => void; onEraser: (active: boolean) => void; onPairHover: (active: boolean) => void }
 type Point = { x: number; y: number }
 type BodyRow = { y: number; left: number; right: number }
 type BodyContour = { width: number; height: number; rows: BodyRow[]; path: string }
@@ -188,7 +188,7 @@ function MagicDust({ id, seed, contour, svgRef }: { id: string; seed: number; co
   })}</svg>
 }
 
-export default function Jar({ jar, project, effect, onOpen, onEraser }: JarProps) {
+export default function Jar({ jar, project, effect, onOpen, onEraser, onPairHover }: JarProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const dustSvgRef = useRef<SVGSVGElement>(null)
   const berryRef = useRef<HTMLSpanElement>(null)
@@ -290,7 +290,7 @@ export default function Jar({ jar, project, effect, onOpen, onEraser }: JarProps
   const restoreProgress = mode.current === 'restoring' ? Math.max(0, 1 - tick / 1800) : 1
   const style = { '--x': jar.x + '%', '--y': jar.y + '%', '--mx': jar.mobileX + '%', '--my': jar.mobileY + '%', '--rotation': jar.rotation + 'deg', '--scale': jar.scale, '--ambient-delay': (-jar.seed / 7) + 's' } as CSSProperties
 
-  return <button className={'jar-button jar-' + jar.shape + (effect && effect !== 'shake' ? ' jar-effect-active' : '') + (effect === 'shake' ? ' jar-shaking' : '') + (effect === 'reassemble' ? ' jar-reassembling' : '')} style={style} type="button" aria-label={'Open ' + project.title + ', ' + project.type + '. Press and hold to erase the light inside.'} data-interactive="true" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { press.current.active = false; if (holdTimer.current) clearTimeout(holdTimer.current); beginRestore() }} onClick={event => { if (event.detail === 0 && berryRef.current) onOpen(project, berryRef.current.getBoundingClientRect()) }}>
+  return <button className={'jar-button jar-' + jar.shape + (effect && effect !== 'shake' ? ' jar-effect-active' : '') + (effect === 'shake' ? ' jar-shaking' : '') + (effect === 'reassemble' ? ' jar-reassembling' : '')} style={style} type="button" aria-label={'Open ' + project.title + ', ' + project.type + '. Press and hold to erase the light inside.'} data-interactive="true" data-jar-number={project.number} onPointerEnter={event => { if (event.pointerType !== 'touch' && (project.number === '06' || project.number === '07')) onPairHover(true) }} onPointerLeave={() => { if (project.number === '06' || project.number === '07') onPairHover(false) }} onFocus={() => { if (project.number === '06' || project.number === '07') onPairHover(true) }} onBlur={() => { if (project.number === '06' || project.number === '07') onPairHover(false) }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { press.current.active = false; if (holdTimer.current) clearTimeout(holdTimer.current); beginRestore() }} onClick={event => { if (event.detail === 0 && berryRef.current) onOpen(project, berryRef.current.getBoundingClientRect()) }}>
     <span className="jar-float">
       <span className="jar-body">
         <img className="jar-photo" src={import.meta.env.BASE_URL + 'jars/' + jar.id + '.webp'} alt="" draggable="false" onLoad={event => setContour(traceBody(event.currentTarget, jar.id))} />
@@ -309,6 +309,6 @@ export default function Jar({ jar, project, effect, onOpen, onEraser }: JarProps
       </span>
       {contour && <MagicDust id={jar.id} seed={jar.seed} contour={contour} svgRef={dustSvgRef} />}
     </span>
-    <span className="jar-index" aria-hidden="true">{project.number}</span>
+    <span className="jar-index-anchor" aria-hidden="true">{project.number}</span>
   </button>
 }
