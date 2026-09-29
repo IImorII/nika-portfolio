@@ -22,7 +22,7 @@ export default function CVPanel({ open, onClose }: { open: boolean; onClose: () 
         <div className="panel-rule" />
         <div className="panel-columns"><section><h3>CONTACT</h3><p>email@example.com</p></section><section><h3>SOCIAL</h3>{['Instagram', 'Behance', 'LinkedIn', 'Are.na'].map(label => <span className="social-placeholder" key={label}>{label} ↗</span>)}</section></div>
       </div>
-      <div className="panel-footer"><span>© NIKA / 20—</span><span>SELECTED WORK</span></div>
+      <div className="panel-footer"><span>© VERONICA CHEREPKO / 2026</span></div>
     </aside>
   </>
 }

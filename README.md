@@ -1,6 +1,6 @@
 # NIKA — interactive portfolio
 
-An editorial still life of eight handmade jars. Each jar holds one blueberry and one demo project.
+An editorial still life of eight photographed glass jars. Each jar holds one blueberry and one demo project.
 
 ## Run
 
@@ -31,10 +31,11 @@ For a custom domain, configure it in **Settings → Pages** and add the matching
 
 ## Replace demo content
 
-- `src/data.ts`: project titles, years, types, descriptions, images, and jar placement/appearance.
+- `src/data.ts`: project titles, years, types, descriptions, images, and jar placement.
 - `public/projects/`: replace the four abstract SVG studies with real project images and update image paths in `src/data.ts`.
-- `src/components/Jar.tsx`: procedural jar silhouettes, fabric patterns, blueberry, particles and label. The eight jar configurations are intentionally distinct. Image-based jar art can be introduced in this component while retaining the interaction logic.
-- `public/jars/`, `public/fabrics/`, `public/blueberries/`, `public/fonts/`: reserved locations for future art assets.
+- `public/jars/jar-01.webp` through `jar-08.webp`: transparent photographic jar cutouts. Replace an image with another transparent WebP at the same path to change its glass shape or fabric. These assets have no floor or cast shadows.
+- `src/components/Jar.tsx`: jar image, interactive light overlay, project click target and press-and-hold behavior.
+- `src/styles.css`: separate widths for each glass shape and the mobile/desktop layout. The mobile NIKA title uses a lighter sans-serif face without offset text shadows.
 - `src/components/CVPanel.tsx`: replace the placeholder biography, experience, email and social labels. No social destination is asserted yet.
 
 The site uses React, TypeScript and Vite. Motion is implemented with CSS transforms and a small amount of `requestAnimationFrame`; reduced-motion and touch preferences are respected.

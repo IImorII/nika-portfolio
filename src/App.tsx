@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { jars, projects } from './data'
 import type { Project } from './data'
@@ -8,17 +8,73 @@ import CVPanel from './components/CVPanel'
 import ProjectView from './components/ProjectView'
 
 type Flight = { project: Project; rect: DOMRect; phase: 'ready' | 'out' | 'return-ready' | 'return' }
+type JarEffect = { id: string; phase: 'shatter' | 'shattered' | 'reassemble' }
+
+const SHATTER_LEAD = 760
+const FLIGHT_OUT = 1450
+const PROJECT_CLOSE = 600
+const FLIGHT_RETURN = 1150
+const JAR_REASSEMBLE = 1050
 
 export default function App() {
   const [cvOpen, setCvOpen] = useState(false)
   const [activeProject, setActiveProject] = useState<Project | null>(null)
   const [closing, setClosing] = useState(false)
   const [flight, setFlight] = useState<Flight | null>(null)
+  const [jarEffect, setJarEffect] = useState<JarEffect | null>(null)
   const [erasing, setErasing] = useState(false)
+  const [inverted, setInverted] = useState(false)
+  const [revealOrigin, setRevealOrigin] = useState({ x: '50%', y: '50%', radius: '150vmax' })
+  const [numberPositions, setNumberPositions] = useState<{ number: string; x: number; y: number }[]>([])
   const [reducedMotion, setReducedMotion] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const shellRef = useRef<HTMLDivElement>(null)
+  const titleRef = useRef<HTMLButtonElement>(null)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const closingRef = useRef(false)
   const lastRect = useRef<DOMRect | null>(null)
   const onEraser = useCallback((active: boolean) => setErasing(active), [])
+
+  const startReveal = () => {
+    const shell = shellRef.current?.getBoundingClientRect()
+    const title = titleRef.current?.getBoundingClientRect()
+    if (shell && title) {
+      const x = title.left + title.width / 2 - shell.left
+      const y = title.top + title.height / 2 - shell.top
+      setRevealOrigin({
+        x: `${x}px`,
+        y: `${y}px`,
+        radius: `${Math.ceil(Math.max(
+          Math.hypot(x, y),
+          Math.hypot(shell.width - x, y),
+          Math.hypot(x, shell.height - y),
+          Math.hypot(shell.width - x, shell.height - y),
+        )) + 2}px`,
+      })
+    }
+    setInverted(true)
+  }
+
+  useLayoutEffect(() => {
+    const shell = shellRef.current
+    if (!shell) return
+    const measure = () => {
+      const shellRect = shell.getBoundingClientRect()
+      setNumberPositions(Array.from(shell.querySelectorAll<HTMLElement>('.jar-index'), label => {
+        const rect = label.getBoundingClientRect()
+        return {
+          number: label.textContent ?? '',
+          x: rect.left + rect.width / 2 - shellRect.left,
+          y: rect.top + rect.height / 2 - shellRect.top,
+        }
+      }))
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(shell)
+    shell.querySelectorAll('.jar-button').forEach(button => observer.observe(button))
+    window.addEventListener('resize', measure)
+    measure()
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
+  }, [])
 
   useEffect(() => {
     const media = matchMedia('(prefers-reduced-motion: reduce)')
@@ -31,44 +87,64 @@ export default function App() {
 
   const later = (fn: () => void, delay: number) => { timers.current.push(setTimeout(fn, delay)) }
   const openProject = (project: Project, rect: DOMRect) => {
-    if (activeProject || flight) return
+    if (activeProject || flight || jarEffect) return
     setCvOpen(false)
     lastRect.current = rect
     if (reducedMotion) { setActiveProject(project); return }
-    setFlight({ project, rect, phase: 'ready' })
-    requestAnimationFrame(() => requestAnimationFrame(() => setFlight(current => current && { ...current, phase: 'out' })))
-    later(() => setActiveProject(project), 760)
-    later(() => setFlight(null), 1330)
+    setJarEffect({ id: project.id, phase: 'shatter' })
+    later(() => {
+      setJarEffect({ id: project.id, phase: 'shattered' })
+      setFlight({ project, rect, phase: 'ready' })
+      requestAnimationFrame(() => requestAnimationFrame(() => setFlight(current => current && { ...current, phase: 'out' })))
+    }, SHATTER_LEAD)
+    later(() => setActiveProject(project), SHATTER_LEAD + FLIGHT_OUT)
+    later(() => setFlight(null), SHATTER_LEAD + FLIGHT_OUT + 720)
   }
   const closeProject = useCallback(() => {
-    if (!activeProject || closing) return
-    if (reducedMotion || !lastRect.current) { setActiveProject(null); return }
+    if (!activeProject || closingRef.current) return
+    if (reducedMotion || !lastRect.current) {
+      setActiveProject(null)
+      setFlight(null)
+      setJarEffect(null)
+      return
+    }
+    closingRef.current = true
     setClosing(true)
     setFlight({ project: activeProject, rect: lastRect.current, phase: 'return-ready' })
-    requestAnimationFrame(() => requestAnimationFrame(() => setFlight(current => current && { ...current, phase: 'return' })))
-    later(() => { setActiveProject(null); setClosing(false); setFlight(null) }, 850)
-  }, [activeProject, closing, reducedMotion])
+    later(() => {
+      setActiveProject(null)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        setFlight(current => current && { ...current, phase: 'return' })
+      }))
+    }, PROJECT_CLOSE)
+    later(() => {
+      setFlight(null)
+      setJarEffect({ id: activeProject.id, phase: 'reassemble' })
+    }, PROJECT_CLOSE + FLIGHT_RETURN + 50)
+    later(() => { closingRef.current = false; setClosing(false); setJarEffect(null) }, PROJECT_CLOSE + FLIGHT_RETURN + 50 + JAR_REASSEMBLE)
+  }, [activeProject, reducedMotion])
 
   const flightStyle = flight ? {
     left: flight.rect.left + flight.rect.width / 2,
     top: flight.rect.top + flight.rect.height / 2,
     '--fly-x': `${window.innerWidth / 2 - (flight.rect.left + flight.rect.width / 2)}px`,
     '--fly-y': `${window.innerHeight / 2 - (flight.rect.top + flight.rect.height / 2)}px`,
-    '--fly-scale': Math.max(window.innerWidth, window.innerHeight) / Math.max(26, flight.rect.width) * 2.3,
+    '--fly-scale': Math.hypot(window.innerWidth, window.innerHeight) / 60 * 1.35,
   } as CSSProperties : undefined
 
   return <>
-    <div className="site-shell">
-      <header className="site-header"><span>NIKA®</span><span className="header-center">AN ARCHIVE OF IDEAS, OBJECTS & IN-BETWEENS</span><button type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT / CV <span aria-hidden="true">↗</span></button></header>
+    <div ref={shellRef} className={`site-shell${inverted ? ' is-inverted' : ''}`} style={{ '--reveal-x': revealOrigin.x, '--reveal-y': revealOrigin.y, '--reveal-radius': revealOrigin.radius } as CSSProperties}>
+      <div className="color-reveal" aria-hidden="true" />
+      <div className="number-reveal" aria-hidden="true">{numberPositions.map(({ number, x, y }) => <span key={number} style={{ left: x, top: y }}>{number}</span>)}</div>
+      <div className="title-reveal" aria-hidden="true"><div className="nika-title nika-title-copy"><span>NIKA</span></div></div>
+      <header className="site-header"><span>NIKA®</span><button type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT / CV <span aria-hidden="true">↗</span></button></header>
       <section className="home" aria-label="Selected portfolio projects">
         <div className="home-stage">
-          <div className="stage-overline"><span>SELECTED WORK</span><span>20— / 20—</span></div>
-          <button type="button" className="nika-title" onClick={() => setCvOpen(true)} data-interactive="true" aria-label="Open Nika's CV"><span>NIKA</span><small>CLICK THE NAME TO MEET THE MAKER ↗</small></button>
-          <div className="jar-scene">{jars.map(jar => <Jar key={jar.id} jar={jar} project={projects.find(p => p.id === jar.projectId)!} onOpen={openProject} onEraser={onEraser} reducedMotion={reducedMotion} />)}</div>
-          <div className="stage-side-note">EIGHT OBJECTS<br />EIGHT STORIES</div>
+          <button ref={titleRef} type="button" className="nika-title" onMouseEnter={startReveal} onMouseLeave={() => setInverted(false)} onFocus={startReveal} onBlur={() => setInverted(false)} onClick={() => setCvOpen(true)} data-interactive="true" aria-label="Open Nika's CV"><span>NIKA</span></button>
+          <div className="jar-scene">{jars.map(jar => <Jar key={jar.id} jar={jar} project={projects.find(p => p.id === jar.projectId)!} effect={jarEffect?.id === jar.projectId ? jarEffect.phase : null} onOpen={openProject} onEraser={onEraser} />)}</div>
         </div>
       </section>
-      <footer className="site-footer"><span>DRAG YOUR EYES AROUND. PICK A JAR.</span><span>CLICK TO OPEN &nbsp;·&nbsp; HOLD TO ERASE</span><span>© NIKA / 20—</span></footer>
+      <footer className="site-footer"><span>© VERONICA CHEREPKO / 2026</span></footer>
     </div>
     <CVPanel open={cvOpen} onClose={() => setCvOpen(false)} />
     {activeProject && <ProjectView project={activeProject} closing={closing} onClose={closeProject} />}

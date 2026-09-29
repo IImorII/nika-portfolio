@@ -1,90 +1,195 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent } from 'react'
 import type { JarConfig, Project } from '../data'
 
-type Stroke = { x: number; y: number; at: number }
-type JarProps = { jar: JarConfig; project: Project; onOpen: (project: Project, berry: DOMRect) => void; onEraser: (active: boolean) => void; reducedMotion: boolean }
+type Stroke = { x: number; y: number }
+type JarProps = { jar: JarConfig; project: Project; effect: 'shatter' | 'shattered' | 'reassemble' | null; onOpen: (project: Project, berry: DOMRect) => void; onEraser: (active: boolean) => void }
+type Point = { x: number; y: number }
+type BodyRow = { y: number; left: number; right: number }
+type BodyContour = { width: number; height: number; rows: BodyRow[]; path: string }
 
-const bodies: Record<JarConfig['shape'], string> = {
-  mason: 'M43 65 Q37 69 37 78 L39 218 Q39 233 54 236 L127 236 Q142 233 142 218 L144 78 Q144 69 137 65 Z',
-  tall: 'M55 64 Q48 69 48 81 L49 221 Q49 238 64 241 L118 241 Q132 237 132 221 L133 81 Q133 69 126 64 Z',
-  squat: 'M32 70 Q24 75 24 90 L27 202 Q27 225 47 229 L133 229 Q153 225 153 202 L156 90 Q156 75 148 70 Z',
-  wide: 'M27 73 Q18 80 19 96 L21 204 Q21 226 42 230 L139 230 Q160 226 160 204 L162 96 Q162 80 153 73 Z',
-  hex: 'M49 67 L132 67 Q141 70 145 82 L153 206 L134 233 L47 233 L28 206 L36 82 Q40 70 49 67 Z',
-  bottle: 'M65 57 L115 57 L116 82 Q129 87 135 103 L141 216 Q142 235 123 239 L57 239 Q38 235 39 216 L45 103 Q51 87 64 82 Z',
-  ribbed: 'M40 70 Q31 77 32 89 L34 217 Q35 232 50 237 L130 237 Q145 232 146 217 L148 89 Q149 77 140 70 Z',
-  round: 'M48 68 Q35 71 31 88 Q21 126 27 184 Q30 225 49 236 L130 236 Q149 225 153 184 Q159 126 149 88 Q145 71 132 68 Z',
+// The cloth covers the neck, so only the visible glass body belongs to the light layer.
+const bodyLimits: Record<string, [number, number]> = {
+  'jar-01': [.215, .89], 'jar-02': [.385, .885],
+  'jar-03': [.285, .875], 'jar-04': [.335, .89],
+  'jar-05': [.405, .865], 'jar-06': [.315, .90],
+  'jar-07': [.325, .90], 'jar-08': [.35, .875],
 }
 
-function JarFabric({ id, fabric }: { id: string; fabric: JarConfig['fabric'] }) {
-  const base: Record<JarConfig['fabric'], string> = {
-    'gingham-red': '#c64439', 'gingham-blue': '#305a8c', floral: '#efe0ca', paisley: '#b97a4b', stripe: '#ecd7ba', embroidered: '#d4d1b3', vintage: '#a5b0a0', patchwork: '#d6a092',
+function traceBody(image: HTMLImageElement, id: string): BodyContour | null {
+  const width = image.naturalWidth
+  const height = image.naturalHeight
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (!context) return null
+  context.drawImage(image, 0, 0)
+  const pixels = context.getImageData(0, 0, width, height).data
+  const [top, bottom] = bodyLimits[id] ?? [.3, .88]
+  const firstY = Math.round(top * height)
+  const lastY = Math.round(bottom * height)
+  const rows: BodyRow[] = []
+  const inset = width * .018
+
+  for (let index = 0; index <= Math.ceil((lastY - firstY) / 5); index++) {
+    const y = Math.min(firstY + index * 5, lastY)
+    let left = width
+    let right = -1
+    for (let x = 0; x < width; x++) {
+      if (pixels[(y * width + x) * 4 + 3] > 100) {
+        left = Math.min(left, x)
+        right = x
+      }
+    }
+    if (right > left + inset * 2) rows.push({ y, left: left + inset, right: right - inset })
   }
-  const pattern = `${id}-fabric`
-  return <>
-    <defs>
-      <pattern id={pattern} patternUnits="userSpaceOnUse" width="30" height="30" patternTransform="rotate(-8)">
-        <rect width="30" height="30" fill={base[fabric]} />
-        {fabric.startsWith('gingham') && <><path d="M0 0H30V10H0ZM0 20H30V30H0Z" fill="#fff" opacity=".57" /><path d="M0 0H10V30H0ZM20 0H30V30H20Z" fill="#fff" opacity=".5" /></>}
-        {fabric === 'floral' && <><path d="M9 8C2 0 0 11 8 13C0 18 8 24 13 16C18 24 25 18 18 13C26 9 22 1 15 8C14 2 10 2 9 8Z" fill="#8e655f" /><circle cx="13" cy="13" r="2.5" fill="#e7a977" /><path d="M25 23q-10-2-10 7" stroke="#6f7c5b" strokeWidth="2" fill="none" /></>}
-        {fabric === 'paisley' && <><path d="M8 24C-2 12 11 0 24 3C14 3 8 10 12 15C17 20 25 10 23 5C30 18 19 30 8 24Z" fill="#e8c58a" stroke="#704f5b" strokeWidth="1" /><circle cx="15" cy="12" r="3" fill="#654e63" /></>}
-        {fabric === 'stripe' && <><path d="M4 0V30M14 0V30M24 0V30" stroke="#426b6d" strokeWidth="3" /><path d="M9 0V30M19 0V30M29 0V30" stroke="#bb6a55" strokeWidth="1.5" /></>}
-        {fabric === 'embroidered' && <><path d="M0 15H30M15 0V30" stroke="#f5f0db" strokeWidth="3" /><path d="M3 3l6 6m12 12 6 6m0-24-6 6M9 21l-6 6" stroke="#8a4842" strokeWidth="2" /><circle cx="15" cy="15" r="3" fill="#ba6d54" /></>}
-        {fabric === 'vintage' && <><path d="M0 15Q8 5 16 15T32 15" fill="none" stroke="#526d5d" strokeWidth="2" /><circle cx="9" cy="14" r="4" fill="#d7b998" /><circle cx="9" cy="14" r="1.5" fill="#8c655b" /><path d="M24 21q-6-8-10-5" fill="none" stroke="#f1e5c8" strokeWidth="3" /></>}
-        {fabric === 'patchwork' && <><path d="M0 0H15V15H0ZM15 15H30V30H15Z" fill="#e9d4a9" /><path d="M15 0H30V15H15ZM0 15H15V30H0Z" fill="#8c827f" /><path d="M0 0L30 30M30 0L0 30" stroke="#fff6de" strokeWidth="1" strokeDasharray="3 3" /></>}
-      </pattern>
-      <linearGradient id={`${id}-clothshade`} x1="0" x2="1"><stop stopColor="#000" stopOpacity=".2"/><stop offset=".25" stopColor="#fff" stopOpacity=".15"/><stop offset=".75" stopColor="#fff" stopOpacity=".08"/><stop offset="1" stopColor="#000" stopOpacity=".22"/></linearGradient>
-    </defs>
-    <path d="M47 23 Q58 16 80 18 Q102 13 127 24 L139 38 L147 61 Q144 69 137 67 L132 79 Q127 83 121 74 L113 79 Q107 82 102 73 L91 78 Q86 82 81 74 L70 79 Q64 82 59 72 L49 76 Q43 76 43 66 L34 68 Q28 67 32 57 L38 37Z" fill={`url(#${pattern})`} stroke="#50463a" strokeOpacity=".18" strokeWidth="1.5" />
-    <path d="M47 23 Q58 16 80 18 Q102 13 127 24 L139 38 L147 61 Q144 69 137 67 L132 79 Q127 83 121 74 L113 79 Q107 82 102 73 L91 78 Q86 82 81 74 L70 79 Q64 82 59 72 L49 76 Q43 76 43 66 L34 68 Q28 67 32 57 L38 37Z" fill={`url(#${id}-clothshade)`} />
-    <path d="M39 57 Q91 69 143 56" fill="none" stroke="#5b4632" strokeOpacity=".55" strokeWidth="2.2" />
-    <path d="M39 61 Q91 74 143 60" fill="none" stroke="#eee0bd" strokeWidth="2" />
-    <path d="M140 61 Q157 70 151 82 M139 62 Q144 77 137 85" fill="none" stroke="#9b856a" strokeWidth="1.8" strokeLinecap="round" />
-  </>
+  if (rows.length < 2) return null
+  const points = [...rows.map(row => `${row.left.toFixed(1)} ${row.y}`),
+    ...rows.slice().reverse().map(row => `${row.right.toFixed(1)} ${row.y}`)]
+  return { width, height, rows, path: `M ${points.join(' L ')} Z` }
 }
 
-export function Blueberry({ id, x = 90, y = 157, size = 29 }: { id: string; x?: number; y?: number; size?: number }) {
-  return <g className="blueberry" data-blueberry="true" transform={`translate(${x} ${y})`}>
-    <defs>
-      <radialGradient id={`${id}-berry`} cx=".3" cy=".24" r=".78"><stop stopColor="#8a93ba" /><stop offset=".35" stopColor="#3a4779" /><stop offset=".72" stopColor="#25284c" /><stop offset="1" stopColor="#10162f" /></radialGradient>
-      <radialGradient id={`${id}-bloom`}><stop stopColor="#b0b4d0" stopOpacity=".47"/><stop offset="1" stopColor="#a6afd0" stopOpacity="0"/></radialGradient>
-    </defs>
-    <circle r={size + 5} fill={`url(#${id}-bloom)`}/>
-    <circle r={size} fill={`url(#${id}-berry)`} stroke="#161936" strokeWidth="1.2" />
-    <path d={`M${-size*.33} ${-size*.69}Q0 ${-size*.82} ${size*.38} ${-size*.5}`} fill="none" stroke="#c9c6d5" strokeOpacity=".4" strokeWidth="2" strokeLinecap="round" />
-    <path d="M-11-22L-5-15L0-22L5-15L12-19L8-10L0-12L-8-9Z" fill="#252947" stroke="#6d7296" strokeWidth="1.2" />
-    <circle cx="-9" cy="-9" r="5" fill="#cad2de" opacity=".2" />
-  </g>
+function bodyAt(contour: BodyContour, y: number): BodyRow {
+  const rows = contour.rows
+  const index = Math.max(0, Math.min(rows.length - 1, Math.floor((y - rows[0].y) / 5)))
+  const from = rows[index]
+  const to = rows[Math.min(index + 1, rows.length - 1)]
+  const fraction = Math.max(0, Math.min(1, (y - from.y) / (to.y - from.y || 1)))
+  return { y, left: from.left + (to.left - from.left) * fraction, right: from.right + (to.right - from.right) * fraction }
 }
 
-function GlowParticles({ id, count, seed }: { id: string; count: number; seed: number }) {
+function makeShards(seed: number) {
+  const columns = 5
+  const rows = 7
+  const random = (index: number) => {
+    const value = Math.sin((index + 1) * 127.1 + seed * 311.7) * 43758.5453
+    return value - Math.floor(value)
+  }
+  const centers = Array.from({ length: columns * rows }, (_, index) => ({
+    x: (index % columns + .5 + (random(index * 2) - .5) * .8) * 100 / columns,
+    y: (Math.floor(index / columns) + .5 + (random(index * 2 + 1) - .5) * .8) * 100 / rows,
+  }))
+
+  return centers.map((center, index) => {
+    let polygon: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }]
+    for (const neighbor of centers) {
+      if (neighbor === center) continue
+      const nx = neighbor.x - center.x
+      const ny = neighbor.y - center.y
+      const limit = (neighbor.x ** 2 + neighbor.y ** 2 - center.x ** 2 - center.y ** 2) / 2
+      const clipped: Point[] = []
+      for (let vertex = 0; vertex < polygon.length; vertex++) {
+        const from = polygon[vertex]
+        const to = polygon[(vertex + 1) % polygon.length]
+        const fromDistance = from.x * nx + from.y * ny - limit
+        const toDistance = to.x * nx + to.y * ny - limit
+        if (fromDistance <= 0) clipped.push(from)
+        if ((fromDistance <= 0) !== (toDistance <= 0)) {
+          const fraction = fromDistance / (fromDistance - toDistance)
+          clipped.push({ x: from.x + (to.x - from.x) * fraction, y: from.y + (to.y - from.y) * fraction })
+        }
+      }
+      polygon = clipped
+      if (!polygon.length) break
+    }
+    return { center, polygon, index }
+  })
+}
+
+function JarFragments({ jar, effect }: { jar: JarConfig; effect: NonNullable<JarProps['effect']> }) {
+  const fragmentsRef = useRef<HTMLSpanElement>(null)
+  const shards = useMemo(() => makeShards(jar.seed), [jar.seed])
+  const [bounds, setBounds] = useState<DOMRect | null>(null)
+  useLayoutEffect(() => {
+    const measure = () => { if (fragmentsRef.current) setBounds(fragmentsRef.current.getBoundingClientRect()) }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+  const src = import.meta.env.BASE_URL + 'jars/' + jar.id + '.webp'
+  return <span ref={fragmentsRef} className={'jar-fragments fragments-' + effect} aria-hidden="true">
+    {shards.map(({ center, polygon, index }) => {
+      const angle = Math.atan2(center.y - 50, center.x - 50) + Math.sin(index * 5.3 + jar.seed) * .8
+      const distance = 105 + (index * 37 + jar.seed * 11) % 115
+      const desiredX = Math.cos(angle) * distance
+      const desiredY = Math.sin(angle) * distance
+      const originX = (bounds?.left ?? 0) + center.x / 100 * (bounds?.width ?? 0)
+      const originY = (bounds?.top ?? 0) + center.y / 100 * (bounds?.height ?? 0)
+      const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
+      const offsetX = bounds ? clamp(desiredX, 24 - originX, window.innerWidth - 24 - originX) : desiredX
+      const offsetY = bounds ? clamp(desiredY, 24 - originY, window.innerHeight - 24 - originY) : desiredY
+      const style = {
+        clipPath: `polygon(${polygon.map(point => `${point.x.toFixed(2)}% ${point.y.toFixed(2)}%`).join(',')})`,
+        '--fragment-x': `${Math.round(offsetX)}px`,
+        '--fragment-y': `${Math.round(offsetY)}px`,
+        '--fragment-rotate': `${(index % 2 ? 1 : -1) * (18 + (index * 17 % 103))}deg`,
+        '--fragment-delay': `${(index % 7) * 11}ms`,
+      } as CSSProperties
+      return <img key={index} src={src} alt="" draggable="false" style={style} />
+    })}
+  </span>
+}
+
+function GlowParticles({ id, count, seed, contour }: { id: string; count: number; seed: number; contour: BodyContour }) {
+  const first = contour.rows[0].y
+  const last = contour.rows[contour.rows.length - 1].y
+  const random = (index: number) => {
+    const value = Math.sin(index * 127.1 + seed * 311.7) * 43758.5453
+    return value - Math.floor(value)
+  }
   return <g className="glow-particles">
-    <defs><radialGradient id={`${id}-glow`}><stop stopColor="#fffbb0"/><stop offset=".19" stopColor="#ffe13e" stopOpacity=".95"/><stop offset=".46" stopColor="#ff8b10" stopOpacity=".68"/><stop offset="1" stopColor="#ff8b10" stopOpacity="0"/></radialGradient></defs>
+    <defs><radialGradient id={id + '-glow'}><stop stopColor="#fffbb0"/><stop offset=".19" stopColor="#ffe13e" stopOpacity=".85"/><stop offset=".46" stopColor="#ff8b10" stopOpacity=".5"/><stop offset="1" stopColor="#ff8b10" stopOpacity="0"/></radialGradient></defs>
     {Array.from({ length: count }, (_, i) => {
-      const x = 57 + ((seed * (i + 3) * 17) % 70)
-      const y = 104 + ((seed * (i + 5) * 11) % 92)
-      const radius = 9 + ((seed + i * 7) % 8)
-      return <circle key={i} className="glow-particle" cx={x} cy={y} r={radius} fill={`url(#${id}-glow)`} style={{ '--duration': `${5.8 + i * .7 + (seed % 3)}s`, '--delay': `${-i * 1.4}s`, '--drift': `${i % 2 ? -8 : 8}px` } as CSSProperties} />
+      const y = first + (i + .25 + random(i * 3) * .5) / count * (last - first)
+      const row = bodyAt(contour, y)
+      const radius = contour.width * (.021 + random(i * 3 + 1) * .017)
+      const x = row.left + (.08 + random(i * 3 + 2) * .84) * (row.right - row.left)
+      const targetY = Math.max(first, Math.min(last, y + (i % 2 ? -1 : 1) * contour.height * (.025 + random(i + 31) * .025)))
+      const targetRow = bodyAt(contour, targetY)
+      const targetX = Math.max(targetRow.left + radius * .5, Math.min(targetRow.right - radius * .5,
+        x + (i % 2 ? 1 : -1) * contour.width * (.025 + random(i + 51) * .035)))
+      const duration = (2.4 + (i % 5) * .33 + (seed % 3) * .18) + 's'
+      const begin = (-i * .47) + 's'
+      return <circle key={i} className="glow-particle" cx={x} cy={y} r={radius} fill={'url(#' + id + '-glow)'} style={{ '--duration': duration, '--delay': begin } as CSSProperties}>
+        <animate attributeName="cx" values={`${x};${targetX};${x}`} dur={duration} begin={begin} repeatCount="indefinite" />
+        <animate attributeName="cy" values={`${y};${targetY};${y}`} dur={duration} begin={begin} repeatCount="indefinite" />
+      </circle>
     })}
   </g>
 }
 
 function MagicDust({ seed }: { seed: number }) {
-  return <span className="magic-dust" aria-hidden="true">{Array.from({ length: 11 }, (_, i) => <i key={i} style={{ '--x': `${10 + ((seed * (i + 2) * 7) % 78)}%`, '--y': `${8 + ((seed * (i + 4) * 13) % 83)}%`, '--d': `${i * .09}s` } as CSSProperties} />)}</span>
+  const count = 34
+  return <span className="magic-dust" aria-hidden="true">{Array.from({ length: count }, (_, i) => {
+    const angle = (i / count) * Math.PI * 2 + seed * .13
+    const x = 50 + (51 + (i % 4) * 3) * Math.cos(angle)
+    const y = 50 + (46 + (i % 3) * 3) * Math.sin(angle)
+    const style = {
+      '--x': x + '%',
+      '--y': y + '%',
+      '--size': (3 + (i % 4)) + 'px',
+      '--d': (-i * .11) + 's',
+      '--dust-duration': (1.1 + (i % 5) * .2) + 's',
+      '--dust-x': ((i % 2 ? -1 : 1) * (5 + i % 4)) + 'px',
+      '--appear-delay': ((i * 13 % count) * 14) + 'ms',
+    } as CSSProperties
+    return <i key={i} style={style} />
+  })}</span>
 }
 
-export default function Jar({ jar, project, onOpen, onEraser, reducedMotion }: JarProps) {
+export default function Jar({ jar, project, effect, onOpen, onEraser }: JarProps) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const berryRef = useRef<SVGGElement | null>(null)
+  const berryRef = useRef<HTMLSpanElement>(null)
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const maxTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const press = useRef({ x: 0, y: 0, active: false, held: false, moved: false })
   const mode = useRef<'idle' | 'erasing' | 'restoring'>('idle')
   const [strokes, setStrokes] = useState<Stroke[]>([])
+  const [contour, setContour] = useState<BodyContour | null>(null)
   const [tick, setTick] = useState(0)
   const releaseAt = useRef(0)
-  const maskId = `${jar.id}-erase`
-  const clipId = `${jar.id}-bodyclip`
+  const maskId = jar.id + '-erase'
 
   const beginRestore = () => {
     if (mode.current !== 'erasing') return
@@ -114,13 +219,27 @@ export default function Jar({ jar, project, onOpen, onEraser, reducedMotion }: J
     onEraser(false)
   }, [onEraser])
 
+  useEffect(() => {
+    if (!contour || !svgRef.current) return
+    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const updateMotion = () => {
+      if (motionPreference.matches) svgRef.current?.pauseAnimations()
+      else svgRef.current?.unpauseAnimations()
+    }
+    updateMotion()
+    motionPreference.addEventListener('change', updateMotion)
+    return () => motionPreference.removeEventListener('change', updateMotion)
+  }, [contour])
+
   const addStroke = (event: PointerEvent<HTMLButtonElement>) => {
-    if (mode.current !== 'erasing' || !svgRef.current) return
+    if (mode.current !== 'erasing' || !svgRef.current || !contour) return
     const matrix = svgRef.current.getScreenCTM()
     if (!matrix) return
     const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse())
-    if (point.x < 22 || point.x > 160 || point.y < 65 || point.y > 240) return
-    setStrokes(current => [...current.slice(-74), { x: point.x, y: point.y, at: performance.now() }])
+    if (point.y < contour.rows[0].y || point.y > contour.rows[contour.rows.length - 1].y) return
+    const row = bodyAt(contour, point.y)
+    if (point.x < row.left || point.x > row.right) return
+    setStrokes(current => [...current.slice(-74), { x: point.x, y: point.y }])
   }
 
   const pointerDown = (event: PointerEvent<HTMLButtonElement>) => {
@@ -149,41 +268,29 @@ export default function Jar({ jar, project, onOpen, onEraser, reducedMotion }: J
     const shouldOpen = !press.current.held && !press.current.moved && mode.current === 'idle'
     press.current.active = false
     beginRestore()
-    if (shouldOpen) {
-      const berry = svgRef.current?.querySelector('[data-blueberry]')?.getBoundingClientRect()
-      if (berry) onOpen(project, berry)
-    }
+    if (shouldOpen && berryRef.current) onOpen(project, berryRef.current.getBoundingClientRect())
   }
 
   const restoreProgress = mode.current === 'restoring' ? Math.max(0, 1 - tick / 1800) : 1
-  const style = { '--x': `${jar.x}%`, '--y': `${jar.y}%`, '--mx': `${jar.mobileX}%`, '--my': `${jar.mobileY}%`, '--rotation': `${jar.rotation}deg`, '--scale': jar.scale, '--ambient-delay': `${-jar.seed / 7}s` } as CSSProperties
+  const style = { '--x': jar.x + '%', '--y': jar.y + '%', '--mx': jar.mobileX + '%', '--my': jar.mobileY + '%', '--rotation': jar.rotation + 'deg', '--scale': jar.scale, '--ambient-delay': (-jar.seed / 7) + 's' } as CSSProperties
 
-  return <button className={`jar-button jar-${jar.shape}`} style={style} type="button" aria-label={`Open ${project.title}, ${project.type}. Press and hold to erase the light inside.`} data-interactive="true" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { press.current.active = false; if (holdTimer.current) clearTimeout(holdTimer.current); beginRestore() }} onClick={event => { if (event.detail === 0) { const berry = svgRef.current?.querySelector('[data-blueberry]')?.getBoundingClientRect(); if (berry) onOpen(project, berry) } }}>
+  return <button className={'jar-button jar-' + jar.shape + (effect ? ' jar-effect-active' : '') + (effect === 'reassemble' ? ' jar-reassembling' : '')} style={style} type="button" aria-label={'Open ' + project.title + ', ' + project.type + '. Press and hold to erase the light inside.'} data-interactive="true" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { press.current.active = false; if (holdTimer.current) clearTimeout(holdTimer.current); beginRestore() }} onClick={event => { if (event.detail === 0 && berryRef.current) onOpen(project, berryRef.current.getBoundingClientRect()) }}>
     <span className="jar-float">
+      <img className="jar-photo" src={import.meta.env.BASE_URL + 'jars/' + jar.id + '.webp'} alt="" draggable="false" onLoad={event => setContour(traceBody(event.currentTarget, jar.id))} />
+      {effect && <JarFragments jar={jar} effect={effect} />}
       <MagicDust seed={jar.seed} />
-      <svg ref={svgRef} className="jar-svg" viewBox="0 0 180 260" role="img" aria-hidden="true">
+      {contour && <svg ref={svgRef} className="jar-light-layer" viewBox={`0 0 ${contour.width} ${contour.height}`} aria-hidden="true">
         <defs>
-          <linearGradient id={`${jar.id}-glass`} x1="0" x2="1"><stop stopColor="#fff" stopOpacity=".82"/><stop offset=".15" stopColor="#cbd4d2" stopOpacity=".17"/><stop offset=".5" stopColor="#f8f5e9" stopOpacity=".1"/><stop offset=".82" stopColor="#b0c0c0" stopOpacity=".17"/><stop offset="1" stopColor="#fff" stopOpacity=".76"/></linearGradient>
-          <linearGradient id={`${jar.id}-tint`} x1="0" x2="0" y2="1"><stop stopColor="#fff9df" stopOpacity=".05"/><stop offset="1" stopColor="#afc5bc" stopOpacity=".3"/></linearGradient>
-          <clipPath id={clipId}><path d={bodies[jar.shape]} /></clipPath>
-          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="260"><rect width="180" height="260" fill="white" />{strokes.map((stroke, i) => <circle key={i} cx={stroke.x} cy={stroke.y} r={25 * restoreProgress} fill="black" />)}</mask>
+          <clipPath id={jar.id + '-body'} clipPathUnits="userSpaceOnUse"><path d={contour.path} /></clipPath>
+          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={contour.width} height={contour.height}>
+            <rect width={contour.width} height={contour.height} fill="white" />
+            {strokes.map((stroke, i) => <circle key={i} cx={stroke.x} cy={stroke.y} r={contour.width * 25 / 180 * restoreProgress} fill="black" />)}
+          </mask>
         </defs>
-        <ellipse cx="91" cy="244" rx="56" ry="6" fill="#3d3427" opacity=".11" />
-        <path d={bodies[jar.shape]} fill={`url(#${jar.id}-tint)`} stroke="#84918e" strokeOpacity=".48" strokeWidth="2" />
-        <g clipPath={`url(#${clipId})`}>
-          <g mask={`url(#${maskId})`}><GlowParticles id={jar.id} count={jar.particleCount} seed={jar.seed} /><path d="M49 193Q92 199 138 188" stroke="#b9bd9b" strokeOpacity=".32" strokeWidth="4" fill="none" /></g>
-          <g ref={berryRef}><Blueberry id={jar.id} x={90 + (jar.seed % 13) - 6} y={154 + (jar.seed % 17) - 8} size={jar.shape === 'squat' ? 27 : 30} /></g>
-          <path d="M46 94Q43 152 48 211" fill="none" stroke="#fff" strokeOpacity=".8" strokeWidth="7" strokeLinecap="round" />
-          <path d="M133 96Q137 154 132 204" fill="none" stroke="#fff" strokeOpacity=".48" strokeWidth="4" strokeLinecap="round" />
-          {jar.shape === 'ribbed' && [0, 1, 2, 3].map(i => <path key={i} d={`M${53 + i * 19} 83Q${46 + i * 22} 160 ${54 + i * 19} 225`} fill="none" stroke="#fff" strokeOpacity=".27" strokeWidth="3" />)}
-        </g>
-        <path d={bodies[jar.shape]} fill={`url(#${jar.id}-glass)`} stroke="#d5dfd9" strokeOpacity=".7" strokeWidth="2" />
-        <path d="M43 219Q91 233 137 219" fill="none" stroke="#a4b4ad" strokeOpacity=".5" strokeWidth="3" />
-        <JarFabric id={jar.id} fabric={jar.fabric} />
-        <g transform="rotate(-4 90 199)"><path d="M58 187L126 184L126 217L58 221Z" fill="#f4f0e6" stroke="#d3c9b7" strokeWidth="1"/><text x="66" y="200" fontFamily="Arial, sans-serif" fontSize="8" fontWeight="700" fill="#262321">{project.number} / {project.type.toUpperCase()}</text><path d="M66 206H116" stroke="#9b9386" strokeWidth=".7"/><text x="66" y="215" fontFamily="Georgia, serif" fontSize="8" fontStyle="italic" fill="#6c6157">nika archive</text></g>
-      </svg>
-      <span className="jar-index" aria-hidden="true">{project.number}</span>
+        <g clipPath={'url(#' + jar.id + '-body)'}><g mask={'url(#' + maskId + ')'}><GlowParticles id={jar.id} count={jar.particleCount} seed={jar.seed} contour={contour} /></g></g>
+      </svg>}
+      <span className="jar-berry-anchor" ref={berryRef} aria-hidden="true" />
     </span>
-    {!reducedMotion && <span className="jar-hint">HOLD TO REVEAL</span>}
+    <span className="jar-index" aria-hidden="true">{project.number}</span>
   </button>
 }
