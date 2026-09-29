@@ -8,8 +8,9 @@ import CVPanel from './components/CVPanel'
 import ProjectView from './components/ProjectView'
 
 type Flight = { project: Project; rect: DOMRect; phase: 'ready' | 'out' | 'return-ready' | 'return' }
-type JarEffect = { id: string; phase: 'shatter' | 'shattered' | 'reassemble' }
+type JarEffect = { id: string; phase: 'shake' | 'shatter' | 'shattered' | 'reassemble' }
 
+const SHAKE_DURATION = 820
 const SHATTER_LEAD = 760
 const FLIGHT_OUT = 1450
 const PROJECT_CLOSE = 600
@@ -91,14 +92,15 @@ export default function App() {
     setCvOpen(false)
     lastRect.current = rect
     if (reducedMotion) { setActiveProject(project); return }
-    setJarEffect({ id: project.id, phase: 'shatter' })
+    setJarEffect({ id: project.id, phase: 'shake' })
+    later(() => setJarEffect({ id: project.id, phase: 'shatter' }), SHAKE_DURATION)
     later(() => {
       setJarEffect({ id: project.id, phase: 'shattered' })
       setFlight({ project, rect, phase: 'ready' })
       requestAnimationFrame(() => requestAnimationFrame(() => setFlight(current => current && { ...current, phase: 'out' })))
-    }, SHATTER_LEAD)
-    later(() => setActiveProject(project), SHATTER_LEAD + FLIGHT_OUT)
-    later(() => setFlight(null), SHATTER_LEAD + FLIGHT_OUT + 720)
+    }, SHAKE_DURATION + SHATTER_LEAD)
+    later(() => setActiveProject(project), SHAKE_DURATION + SHATTER_LEAD + FLIGHT_OUT)
+    later(() => setFlight(null), SHAKE_DURATION + SHATTER_LEAD + FLIGHT_OUT + 720)
   }
   const closeProject = useCallback(() => {
     if (!activeProject || closingRef.current) return
@@ -136,7 +138,6 @@ export default function App() {
     <div ref={shellRef} className={`site-shell${inverted ? ' is-inverted' : ''}`} style={{ '--reveal-x': revealOrigin.x, '--reveal-y': revealOrigin.y, '--reveal-radius': revealOrigin.radius } as CSSProperties}>
       <div className="color-reveal" aria-hidden="true" />
       <div className="number-reveal" aria-hidden="true">{numberPositions.map(({ number, x, y }) => <span key={number} style={{ left: x, top: y }}>{number}</span>)}</div>
-      <div className="title-reveal" aria-hidden="true"><div className="nika-title nika-title-copy"><span>NIKA</span></div></div>
       <header className="site-header"><span>NIKA®</span><button type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT / CV <span aria-hidden="true">↗</span></button></header>
       <section className="home" aria-label="Selected portfolio projects">
         <div className="home-stage">

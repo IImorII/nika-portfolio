@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, PointerEvent } from 'react'
+import type { CSSProperties, PointerEvent, RefObject } from 'react'
 import type { JarConfig, Project } from '../data'
 
 type Stroke = { x: number; y: number }
-type JarProps = { jar: JarConfig; project: Project; effect: 'shatter' | 'shattered' | 'reassemble' | null; onOpen: (project: Project, berry: DOMRect) => void; onEraser: (active: boolean) => void }
+type JarProps = { jar: JarConfig; project: Project; effect: 'shake' | 'shatter' | 'shattered' | 'reassemble' | null; onOpen: (project: Project, berry: DOMRect) => void; onEraser: (active: boolean) => void }
 type Point = { x: number; y: number }
 type BodyRow = { y: number; left: number; right: number }
 type BodyContour = { width: number; height: number; rows: BodyRow[]; path: string }
@@ -57,6 +57,15 @@ function bodyAt(contour: BodyContour, y: number): BodyRow {
   const to = rows[Math.min(index + 1, rows.length - 1)]
   const fraction = Math.max(0, Math.min(1, (y - from.y) / (to.y - from.y || 1)))
   return { y, left: from.left + (to.left - from.left) * fraction, right: from.right + (to.right - from.right) * fraction }
+}
+
+function particleRandom(seed: number, index: number) {
+  const value = Math.sin(index * 127.1 + seed * 311.7) * 43758.5453
+  return value - Math.floor(value)
+}
+
+function GlowGradient({ id }: { id: string }) {
+  return <radialGradient id={id}><stop stopColor="#fffbb0"/><stop offset=".19" stopColor="#ffe13e" stopOpacity=".85"/><stop offset=".46" stopColor="#ff8b10" stopOpacity=".5"/><stop offset="1" stopColor="#ff8b10" stopOpacity="0"/></radialGradient>
 }
 
 function makeShards(seed: number) {
@@ -134,12 +143,9 @@ function JarFragments({ jar, effect }: { jar: JarConfig; effect: NonNullable<Jar
 function GlowParticles({ id, count, seed, contour }: { id: string; count: number; seed: number; contour: BodyContour }) {
   const first = contour.rows[0].y
   const last = contour.rows[contour.rows.length - 1].y
-  const random = (index: number) => {
-    const value = Math.sin(index * 127.1 + seed * 311.7) * 43758.5453
-    return value - Math.floor(value)
-  }
+  const random = (index: number) => particleRandom(seed, index)
   return <g className="glow-particles">
-    <defs><radialGradient id={id + '-glow'}><stop stopColor="#fffbb0"/><stop offset=".19" stopColor="#ffe13e" stopOpacity=".85"/><stop offset=".46" stopColor="#ff8b10" stopOpacity=".5"/><stop offset="1" stopColor="#ff8b10" stopOpacity="0"/></radialGradient></defs>
+    <defs><GlowGradient id={id + '-glow'} /></defs>
     {Array.from({ length: count }, (_, i) => {
       const y = first + (i + .25 + random(i * 3) * .5) / count * (last - first)
       const row = bodyAt(contour, y)
@@ -159,27 +165,32 @@ function GlowParticles({ id, count, seed, contour }: { id: string; count: number
   </g>
 }
 
-function MagicDust({ seed }: { seed: number }) {
-  const count = 34
-  return <span className="magic-dust" aria-hidden="true">{Array.from({ length: count }, (_, i) => {
+function MagicDust({ id, seed, contour, svgRef }: { id: string; seed: number; contour: BodyContour; svgRef: RefObject<SVGSVGElement | null> }) {
+  const count = 36
+  const gradientId = id + '-dust-glow'
+  return <svg ref={svgRef} className="magic-dust" viewBox={`0 0 ${contour.width} ${contour.height}`} aria-hidden="true">
+    <defs><GlowGradient id={gradientId} /></defs>
+    {Array.from({ length: count }, (_, i) => {
     const angle = (i / count) * Math.PI * 2 + seed * .13
-    const x = 50 + (51 + (i % 4) * 3) * Math.cos(angle)
-    const y = 50 + (46 + (i % 3) * 3) * Math.sin(angle)
-    const style = {
-      '--x': x + '%',
-      '--y': y + '%',
-      '--size': (3 + (i % 4)) + 'px',
-      '--d': (-i * .11) + 's',
-      '--dust-duration': (1.1 + (i % 5) * .2) + 's',
-      '--dust-x': ((i % 2 ? -1 : 1) * (5 + i % 4)) + 'px',
-      '--appear-delay': ((i * 13 % count) * 14) + 'ms',
-    } as CSSProperties
-    return <i key={i} style={style} />
-  })}</span>
+    const x = contour.width * (.5 + (.51 + (i % 4) * .03) * Math.cos(angle))
+    const y = contour.height * (.5 + (.46 + (i % 3) * .03) * Math.sin(angle))
+    const radius = contour.width * (.021 + particleRandom(seed, i * 3 + 1) * .017)
+    const targetX = x + (i % 2 ? 1 : -1) * contour.width * (.025 + particleRandom(seed, i + 51) * .035)
+    const targetY = y + (i % 2 ? -1 : 1) * contour.height * (.025 + particleRandom(seed, i + 31) * .025)
+    const duration = (2.4 + (i % 5) * .33 + (seed % 3) * .18) + 's'
+    const begin = (-i * .47) + 's'
+    return <g key={i} className="dust-particle" style={{ '--appear-delay': ((i * 13 % count) * 14) + 'ms' } as CSSProperties}>
+      <circle className="glow-particle" cx={x} cy={y} r={radius} fill={`url(#${gradientId})`} style={{ '--duration': duration, '--delay': begin } as CSSProperties}>
+        <animate attributeName="cx" values={`${x};${targetX};${x}`} dur={duration} begin={begin} repeatCount="indefinite" />
+        <animate attributeName="cy" values={`${y};${targetY};${y}`} dur={duration} begin={begin} repeatCount="indefinite" />
+      </circle>
+    </g>
+  })}</svg>
 }
 
 export default function Jar({ jar, project, effect, onOpen, onEraser }: JarProps) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const dustSvgRef = useRef<SVGSVGElement>(null)
   const berryRef = useRef<HTMLSpanElement>(null)
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const maxTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -223,8 +234,13 @@ export default function Jar({ jar, project, effect, onOpen, onEraser }: JarProps
     if (!contour || !svgRef.current) return
     const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
     const updateMotion = () => {
-      if (motionPreference.matches) svgRef.current?.pauseAnimations()
-      else svgRef.current?.unpauseAnimations()
+      if (motionPreference.matches) {
+        svgRef.current?.pauseAnimations()
+        dustSvgRef.current?.pauseAnimations()
+      } else {
+        svgRef.current?.unpauseAnimations()
+        dustSvgRef.current?.unpauseAnimations()
+      }
     }
     updateMotion()
     motionPreference.addEventListener('change', updateMotion)
@@ -274,22 +290,24 @@ export default function Jar({ jar, project, effect, onOpen, onEraser }: JarProps
   const restoreProgress = mode.current === 'restoring' ? Math.max(0, 1 - tick / 1800) : 1
   const style = { '--x': jar.x + '%', '--y': jar.y + '%', '--mx': jar.mobileX + '%', '--my': jar.mobileY + '%', '--rotation': jar.rotation + 'deg', '--scale': jar.scale, '--ambient-delay': (-jar.seed / 7) + 's' } as CSSProperties
 
-  return <button className={'jar-button jar-' + jar.shape + (effect ? ' jar-effect-active' : '') + (effect === 'reassemble' ? ' jar-reassembling' : '')} style={style} type="button" aria-label={'Open ' + project.title + ', ' + project.type + '. Press and hold to erase the light inside.'} data-interactive="true" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { press.current.active = false; if (holdTimer.current) clearTimeout(holdTimer.current); beginRestore() }} onClick={event => { if (event.detail === 0 && berryRef.current) onOpen(project, berryRef.current.getBoundingClientRect()) }}>
+  return <button className={'jar-button jar-' + jar.shape + (effect && effect !== 'shake' ? ' jar-effect-active' : '') + (effect === 'shake' ? ' jar-shaking' : '') + (effect === 'reassemble' ? ' jar-reassembling' : '')} style={style} type="button" aria-label={'Open ' + project.title + ', ' + project.type + '. Press and hold to erase the light inside.'} data-interactive="true" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { press.current.active = false; if (holdTimer.current) clearTimeout(holdTimer.current); beginRestore() }} onClick={event => { if (event.detail === 0 && berryRef.current) onOpen(project, berryRef.current.getBoundingClientRect()) }}>
     <span className="jar-float">
-      <img className="jar-photo" src={import.meta.env.BASE_URL + 'jars/' + jar.id + '.webp'} alt="" draggable="false" onLoad={event => setContour(traceBody(event.currentTarget, jar.id))} />
-      {effect && <JarFragments jar={jar} effect={effect} />}
-      <MagicDust seed={jar.seed} />
-      {contour && <svg ref={svgRef} className="jar-light-layer" viewBox={`0 0 ${contour.width} ${contour.height}`} aria-hidden="true">
-        <defs>
-          <clipPath id={jar.id + '-body'} clipPathUnits="userSpaceOnUse"><path d={contour.path} /></clipPath>
-          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={contour.width} height={contour.height}>
-            <rect width={contour.width} height={contour.height} fill="white" />
-            {strokes.map((stroke, i) => <circle key={i} cx={stroke.x} cy={stroke.y} r={contour.width * 25 / 180 * restoreProgress} fill="black" />)}
-          </mask>
-        </defs>
-        <g clipPath={'url(#' + jar.id + '-body)'}><g mask={'url(#' + maskId + ')'}><GlowParticles id={jar.id} count={jar.particleCount} seed={jar.seed} contour={contour} /></g></g>
-      </svg>}
-      <span className="jar-berry-anchor" ref={berryRef} aria-hidden="true" />
+      <span className="jar-body">
+        <img className="jar-photo" src={import.meta.env.BASE_URL + 'jars/' + jar.id + '.webp'} alt="" draggable="false" onLoad={event => setContour(traceBody(event.currentTarget, jar.id))} />
+        {effect && effect !== 'shake' && <JarFragments jar={jar} effect={effect} />}
+        {contour && <svg ref={svgRef} className="jar-light-layer" viewBox={`0 0 ${contour.width} ${contour.height}`} aria-hidden="true">
+          <defs>
+            <clipPath id={jar.id + '-body'} clipPathUnits="userSpaceOnUse"><path d={contour.path} /></clipPath>
+            <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={contour.width} height={contour.height}>
+              <rect width={contour.width} height={contour.height} fill="white" />
+              {strokes.map((stroke, i) => <circle key={i} cx={stroke.x} cy={stroke.y} r={contour.width * 25 / 180 * restoreProgress} fill="black" />)}
+            </mask>
+          </defs>
+          <g clipPath={'url(#' + jar.id + '-body)'}><g mask={'url(#' + maskId + ')'}><GlowParticles id={jar.id} count={jar.particleCount} seed={jar.seed} contour={contour} /></g></g>
+        </svg>}
+        <span className="jar-berry-anchor" ref={berryRef} aria-hidden="true" />
+      </span>
+      {contour && <MagicDust id={jar.id} seed={jar.seed} contour={contour} svgRef={dustSvgRef} />}
     </span>
     <span className="jar-index" aria-hidden="true">{project.number}</span>
   </button>
