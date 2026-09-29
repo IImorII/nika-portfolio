@@ -13,14 +13,14 @@ Open the printed local URL. The development command watches source files and reb
 
 ## Deploy to GitHub Pages
 
-The workflow in `.github/workflows/deploy.yml` builds the site and deploys it to GitHub Pages whenever you push to `main` or `master`. It also supports a manual run from the repository's **Actions** tab. Vite uses the repository name as the project-site path automatically; for a `username.github.io` repository, the site uses `/` as its base path.
+The workflow in `.github/workflows/deploy.yml` builds the site and deploys it to GitHub Pages whenever you push to `main` or `master`. It also supports a manual run from the repository's **Actions** tab. Vite gets its base path from GitHub Pages, so project URLs, `username.github.io` sites, and custom domains use the correct asset paths.
 
 1. Push this project to a GitHub repository.
 2. In the repository, open **Settings → Pages** and select **GitHub Actions** under **Build and deployment → Source**.
 3. Push to `main` or `master`, or run **Deploy to GitHub Pages** manually from **Actions**.
 4. When the workflow succeeds, open the published URL shown in its `deploy` job or on **Settings → Pages**.
 
-For a custom domain with a regular project repository, set `VITE_BASE_PATH` to `/` in the **Build site** step in `.github/workflows/deploy.yml` so asset URLs use the domain root.
+For a custom domain, configure it in **Settings → Pages** and add the matching DNS records at your domain provider.
 
 ## Interactions
 
