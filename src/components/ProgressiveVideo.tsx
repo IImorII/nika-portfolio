@@ -30,13 +30,23 @@ export default function ProgressiveVideo({ media, label, playing = true }: { med
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-    if (playing) void video.play().catch(() => {})
-    else video.pause()
-    return () => video.pause()
+    if (playing) {
+      video.src = src
+      void video.play().catch(() => {})
+    } else {
+      video.pause()
+      video.removeAttribute('src')
+      video.load()
+    }
+    return () => {
+      video.pause()
+      video.removeAttribute('src')
+      video.load()
+    }
   }, [src, playing])
 
   return <span className="progressive-image" data-has-preview={!!media.preview} data-ready={decodedSrc === src}>
     {media.preview && <img className="image-preview" src={media.preview} alt="" aria-hidden="true" width={media.width} height={media.height} draggable="false" />}
-    <video ref={videoRef} className="image-original" src={src} poster={media.preview} width={media.width} height={media.height} loop muted playsInline preload="auto" aria-label={label} />
+    <video ref={videoRef} className="image-original" poster={media.preview} width={media.width} height={media.height} loop muted playsInline preload="none" aria-label={label} />
   </span>
 }

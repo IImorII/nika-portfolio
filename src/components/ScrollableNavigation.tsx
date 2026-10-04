@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
-export default function ScrollableNavigation({ label, className, activeKey, children }: {
-  label: string; className: string; activeKey: string; children: ReactNode
+export default function ScrollableNavigation({ label, className, activeKey, revealActive = true, children }: {
+  label: string; className: string; activeKey: string; revealActive?: boolean; children: ReactNode
 }) {
   const navRef = useRef<HTMLElement>(null)
   const [edges, setEdges] = useState({ overflow: false, start: true, end: true })
@@ -24,9 +24,9 @@ export default function ScrollableNavigation({ label, className, activeKey, chil
     return () => observer.disconnect()
   }, [children])
   useLayoutEffect(() => {
-    navRef.current?.querySelector<HTMLElement>('[aria-current="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    if (revealActive) navRef.current?.querySelector<HTMLElement>('[aria-current="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     measure()
-  }, [activeKey])
+  }, [activeKey, revealActive])
   const scroll = (direction: number) => {
     const nav = navRef.current
     if (!nav) return
