@@ -18,7 +18,7 @@ export default function useSwipeNavigation(onNavigate: (direction: number) => vo
   return {
     onPointerDown: (event: PointerEvent<HTMLElement>) => {
       if (!event.isPrimary) { gesture.current = null; blockClick(); return }
-      if (event.button !== 0 || (event.target as Element).closest('button:not(.work-image-button), a')) return
+      if (event.button !== 0 || (event.target as Element).closest('button:not(.work-image-button):not(.media-edge-button), a')) return
       gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, horizontal: false, cancelled: false }
       suppressClickUntil.current = 0
     },
@@ -50,7 +50,15 @@ export default function useSwipeNavigation(onNavigate: (direction: number) => vo
       }
     },
     onPointerCancel: (event: PointerEvent<HTMLElement>) => { blockClick(); reset(event) },
-    onLostPointerCapture: () => { gesture.current = null },
+    onLostPointerCapture: (event: PointerEvent<HTMLElement>) => {
+      // Touch starts with implicit capture on the image/video under the finger.
+      // Its lost-capture event bubbles here when we capture the horizontal drag.
+      // Only losing the carousel's own capture ends the gesture.
+      if (event.target === event.currentTarget && gesture.current?.id === event.pointerId) {
+        blockClick()
+        gesture.current = null
+      }
+    },
     onClickCapture: (event: MouseEvent<HTMLElement>) => {
       if (event.detail !== 0 && performance.now() < suppressClickUntil.current) {
         event.preventDefault()

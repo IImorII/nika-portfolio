@@ -10,15 +10,18 @@ const source = readFileSync(new URL('../src/useSwipeNavigation.ts', import.meta.
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText.replace(/from ['"]react['"]/, `from '${reactStub}'`)
 const { default: useSwipeNavigation } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'))
 
-function fixture() {
+function fixture({ implicitCapture = false } = {}) {
   const moves = []
   const captured = new Set()
   const handlers = useSwipeNavigation(direction => moves.push(direction))
   const target = { closest: () => null }
   const currentTarget = {
-    setPointerCapture: id => captured.add(id),
+    setPointerCapture: id => {
+      captured.add(id)
+      if (implicitCapture) handlers.onLostPointerCapture({ pointerId: id, target, currentTarget })
+    },
     hasPointerCapture: id => captured.has(id),
-    releasePointerCapture: id => { captured.delete(id); handlers.onLostPointerCapture() },
+    releasePointerCapture: id => { captured.delete(id); handlers.onLostPointerCapture({ pointerId: id, target: currentTarget, currentTarget }) },
   }
   const event = (x, y, extra = {}) => ({ pointerId: 1, isPrimary: true, button: 0, clientX: x, clientY: y, currentTarget, target, ...extra })
   const click = (detail = 1) => {
@@ -50,6 +53,27 @@ test('left/right swipes navigate once, release capture and block the resulting c
   }
 })
 
+test('touch swipes survive implicit capture transferring from artwork to the carousel', () => {
+  for (const [dx, direction] of [[-80, 1], [80, -1]]) {
+    const f = fixture({ implicitCapture: true })
+    f.handlers.onPointerDown(f.event(100, 100, { pointerType: 'touch' }))
+    f.handlers.onPointerMove(f.event(100 + dx / 2, 103, { pointerType: 'touch' }))
+    f.handlers.onPointerUp(f.event(100 + dx, 108, { pointerType: 'touch' }))
+    assert.deepEqual(f.moves, [direction])
+    assert.equal(f.captured.size, 0)
+    assert.equal(f.click(), true, 'swiping artwork must not open fullscreen')
+  }
+})
+
+test('losing capture for another pointer does not interrupt the active swipe', () => {
+  const f = fixture()
+  f.handlers.onPointerDown(f.event(100, 100))
+  f.handlers.onPointerMove(f.event(60, 100))
+  f.handlers.onLostPointerCapture(f.event(60, 100, { pointerId: 2, target: f.event(0, 0).currentTarget }))
+  f.handlers.onPointerUp(f.event(20, 100))
+  assert.deepEqual(f.moves, [1])
+})
+
 test('tap jitter, short drags, vertical gestures and diagonals do not change slides', () => {
   for (const [dx, dy] of [[3, 2], [25, 2], [5, 90], [50, 50], [45, 40]]) {
     const f = fixture()
@@ -77,7 +101,7 @@ test('cancelled, multi-touch and unrelated pointer gestures never navigate', () 
     f.handlers.onPointerMove(f.event(60, 100))
     if (cancel === 'cancel') f.handlers.onPointerCancel(f.event(60, 100))
     if (cancel === 'multi') f.handlers.onPointerDown(f.event(80, 110, { pointerId: 2, isPrimary: false }))
-    if (cancel === 'lost') f.handlers.onLostPointerCapture()
+    if (cancel === 'lost') f.handlers.onLostPointerCapture(f.event(60, 100, { target: f.event(0, 0).currentTarget }))
     f.handlers.onPointerUp(f.event(20, 100))
     assert.deepEqual(f.moves, [])
   }

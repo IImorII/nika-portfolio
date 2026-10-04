@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { Category, PortfolioProject } from '../data'
 import { categories } from '../data'
 import useWorkLayout from '../useWorkLayout'
@@ -163,11 +164,13 @@ export default function ProjectView({ project: initialCategory, closing, instant
     {current && <div className="media-viewer" role="dialog" aria-modal="true" aria-label={project.title}>
       <header><span>{project.title}</span><button ref={viewerCloseRef} className="icon-button" type="button" onClick={closeViewer} data-interactive="true" aria-label="Close fullscreen">×</button></header>
       <div ref={viewerStageRef} className="media-viewer-stage" {...mediaSwipe}>
-        {current.kind === 'video' ? <ProgressiveVideo key={current.path} media={current} label={project.title} /> : <ProgressiveImage key={current.path} media={current} label={project.title} priority="high" />}
-        {canNavigateMedia && <>
-          <button className="section-arrow section-arrow-prev" type="button" disabled={closing} onClick={() => changeMedia(-1)} data-interactive="true" aria-label="Previous work"><span aria-hidden="true">←</span></button>
-          <button className="section-arrow section-arrow-next" type="button" disabled={closing} onClick={() => changeMedia(1)} data-interactive="true" aria-label="Next work"><span aria-hidden="true">→</span></button>
-        </>}
+        <div className="media-viewer-artwork" style={{ '--media-aspect': current.width / current.height } as CSSProperties}>
+          {current.kind === 'video' ? <ProgressiveVideo key={current.path} media={current} label={project.title} /> : <ProgressiveImage key={current.path} media={current} label={project.title} priority="high" />}
+          {canNavigateMedia && <>
+            <button className="media-edge-button media-edge-prev" type="button" disabled={closing} onClick={() => changeMedia(-1)} data-interactive="true" aria-label="Previous work" />
+            <button className="media-edge-button media-edge-next" type="button" disabled={closing} onClick={() => changeMedia(1)} data-interactive="true" aria-label="Next work" />
+          </>}
+        </div>
       </div>
       <footer><div className="media-viewer-navigation" aria-live="polite" aria-atomic="true"><span className="media-position">{selected! + 1} / {allMedia.length}</span><span className="media-position">Section {sectionIndex + 1} / {sections.length}</span></div><ProjectCopyright copyright={project.copyright} /></footer>
     </div>}
