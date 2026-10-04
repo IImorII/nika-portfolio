@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync, statSync, createReadStream, openSync, readSync, closeSync } from 'node:fs'
 import { pipeline } from 'node:stream'
 import path from 'node:path'
-import { readMediaDimensions, readImagePreview } from './media-dimensions.mjs'
+import { readMediaDimensions, readImagePreview, readVideoPreview } from './media-dimensions.mjs'
 
 const moduleId = 'virtual:portfolio-assets'
 const resolvedId = '\0' + moduleId
@@ -225,7 +225,7 @@ export async function scanPortfolioWithDimensions(root, { previews = false } = {
       const item = media[next++]
       const file = path.join(root, ...item.path.split('/').slice(1).map(decodeURIComponent))
       Object.assign(item, await readMediaDimensions(file, item.kind))
-      if (previews && item.kind === 'image') item.preview = await readImagePreview(file)
+      if (previews) item.preview = await (item.kind === 'video' ? readVideoPreview(file) : readImagePreview(file))
     }
   }))
   return catalog

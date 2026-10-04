@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import sharp from 'sharp'
-import { readMediaDimensions, readImagePreview } from './media-dimensions.mjs'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import ffmpeg from '@ffmpeg-installer/ffmpeg'
+import { readMediaDimensions, readImagePreview, readVideoPreview } from './media-dimensions.mjs'
 import { scanPortfolioWithDimensions } from './portfolio-assets.mjs'
 
 function fixture(t) {
@@ -15,6 +18,36 @@ function fixture(t) {
 }
 
 const image = (width, height) => sharp({ create: { width, height, channels: 4, background: '#abcdef' } })
+const runFFmpeg = promisify(execFile)
+
+test('video preview uses the first frame, respects rotation and updates after replacement', async t => {
+  const root = fixture(t)
+  const file = path.join(root, 'видео 50% #1.mp4')
+  await sharp({ create: { width: 80, height: 40, channels: 3, background: '#ff0000' } }).png().toFile(path.join(root, 'frame01.png'))
+  await sharp({ create: { width: 80, height: 40, channels: 3, background: '#0000ff' } }).png().toFile(path.join(root, 'frame02.png'))
+  await runFFmpeg(ffmpeg.path, ['-loglevel', 'error', '-y', '-framerate', '1', '-i', path.join(root, 'frame%02d.png'), '-frames:v', '2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', file], { windowsHide: true })
+  const preview = await readVideoPreview(file)
+  const buffer = Buffer.from(preview.split(',')[1], 'base64')
+  assert.ok(preview.startsWith('data:image/webp;base64,'))
+  assert.ok(buffer.length < 2048)
+  assert.deepEqual([(await sharp(buffer).metadata()).width, (await sharp(buffer).metadata()).height], [32, 16])
+  const { channels } = await sharp(buffer).stats()
+  assert.ok(channels[0].mean > 180 && channels[2].mean < 80, 'preview must be the red first frame, not the blue second frame')
+  const rotated = path.join(root, 'rotated.mp4')
+  await runFFmpeg(ffmpeg.path, ['-loglevel', 'error', '-y', '-i', file, '-c', 'copy', '-metadata:s:v:0', 'rotate=90', rotated], { windowsHide: true })
+  const rotatedBuffer = Buffer.from((await readVideoPreview(rotated)).split(',')[1], 'base64')
+  const rotatedMetadata = await sharp(rotatedBuffer).metadata()
+  assert.deepEqual([rotatedMetadata.width, rotatedMetadata.height], [16, 32])
+  await runFFmpeg(ffmpeg.path, ['-loglevel', 'error', '-y', '-i', path.join(root, 'frame02.png'), '-frames:v', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', file], { windowsHide: true })
+  assert.notEqual(await readVideoPreview(file), preview)
+  mkdirSync(path.join(root, 'digital/works/test/section_1'), { recursive: true })
+  writeFileSync(path.join(root, 'digital/jar.webp'), 'fixture')
+  writeFileSync(path.join(root, 'digital/works/test/section_1/movie.mp4'), readFileSync(file))
+  const catalog = await scanPortfolioWithDimensions(root, { previews: true })
+  const project = catalog.categories[0].projects[0]
+  assert.equal(project.media[0].preview, await readVideoPreview(file))
+  assert.strictEqual(project.sections[0].media[0], project.media[0])
+})
 
 test('reads every supported image format and browser EXIF orientation', async t => {
   const root = fixture(t)
@@ -93,6 +126,7 @@ test('invalid media fails with its path instead of silently using square placeho
     const file = path.join(root, name)
     writeFileSync(file, content)
     await assert.rejects(readMediaDimensions(file, kind), error => error.message.includes(file) && error.message.includes('cannot read media dimensions'))
+    if (kind === 'video') await assert.rejects(readVideoPreview(file), error => error.message.includes(file) && error.message.includes('cannot create video preview'))
   }
 })
 
@@ -123,10 +157,8 @@ test('every shipped image and video has dimensions before any browser request', 
   for (const item of media) {
     assert.ok(item.width > 0 && item.height > 0, item.path)
     assert.ok(Number.isFinite(item.width / item.height), item.path)
-    if (item.kind === 'image') {
-      assert.ok(item.preview.startsWith('data:image/webp;base64,'), item.path)
-      const preview = await sharp(Buffer.from(item.preview.split(',')[1], 'base64')).metadata()
-      assert.ok(preview.width <= 32 && preview.height <= 32, item.path)
-    } else assert.equal(item.preview, undefined)
+    assert.ok(item.preview.startsWith('data:image/webp;base64,'), item.path)
+    const preview = await sharp(Buffer.from(item.preview.split(',')[1], 'base64')).metadata()
+    assert.ok(preview.width <= 32 && preview.height <= 32, item.path)
   }
 })

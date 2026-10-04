@@ -1,5 +1,10 @@
 import { openSync, closeSync, readSync, fstatSync } from 'node:fs'
 import sharp from 'sharp'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import ffmpeg from '@ffmpeg-installer/ffmpeg'
+
+const runFFmpeg = promisify(execFile)
 
 // Header scans must release files so assets can be replaced in Windows watch builds.
 sharp.cache({ files: 0 })
@@ -72,16 +77,36 @@ export async function readMediaDimensions(file, kind) {
   }
 }
 
+async function encodePreview(input) {
+  const preview = await sharp(input)
+    .autoOrient()
+    .resize({ width: 32, height: 32, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 30, effort: 3 })
+    .toBuffer()
+  return `data:image/webp;base64,${preview.toString('base64')}`
+}
+
 export async function readImagePreview(file) {
   try {
     // Inline a tiny first frame so opening a section needs no preview requests.
-    const preview = await sharp(file)
-      .autoOrient()
-      .resize({ width: 32, height: 32, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 30, effort: 3 })
-      .toBuffer()
-    return `data:image/webp;base64,${preview.toString('base64')}`
+    return await encodePreview(file)
   } catch (error) {
     throw new Error(`${file}: cannot create image preview: ${error.message}`, { cause: error })
+  }
+}
+
+export async function readVideoPreview(file) {
+  try {
+    // Decode exactly the first video frame, applying the MP4 rotation metadata.
+    // Pass arguments directly without a shell so arbitrary asset names are safe.
+    const { stdout } = await runFFmpeg(ffmpeg.path, [
+      '-hide_banner', '-loglevel', 'error', '-nostdin', '-threads', '1',
+      '-i', file, '-map', '0:v:0', '-frames:v', '1', '-an', '-sn', '-dn',
+      '-vf', "scale=w='min(32,iw)':h='min(32,ih)':force_original_aspect_ratio=decrease",
+      '-threads', '1', '-f', 'image2pipe', '-vcodec', 'png', 'pipe:1',
+    ], { encoding: 'buffer', windowsHide: true, timeout: 30000, maxBuffer: 1024 * 1024 })
+    return await encodePreview(stdout)
+  } catch (error) {
+    throw new Error(`${file}: cannot create video preview: ${error.message}`, { cause: error })
   }
 }
