@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { jars, projects } from './data'
-import type { Project } from './data'
+import { jars, categories, desktopStageHeight, mobileStageHeight, blueberryUrl } from './data'
+import type { Category } from './data'
 import Jar from './components/Jar'
 import CustomCursor from './components/CustomCursor'
 import CVPanel from './components/CVPanel'
 import ProjectView from './components/ProjectView'
-import NikaTitle from './components/NikaTitle'
+import VeronicaTitle from './components/VeronicaTitle'
+import CategoryLabel from './components/CategoryLabel'
 import SixSevenEffect from './components/SixSevenEffect'
+import type { ReservedArea } from './components/SixSevenEffect'
 
-type Flight = { project: Project; rect: DOMRect; phase: 'ready' | 'out' | 'return-ready' | 'return' }
+type Flight = { project: Category; rect: DOMRect; phase: 'ready' | 'out' | 'return-ready' | 'return' }
 type JarEffect = { id: string; phase: 'shake' | 'shatter' | 'shattered' | 'reassemble' }
 
 const SHAKE_DURATION = 820
@@ -21,7 +23,12 @@ const JAR_REASSEMBLE = 1050
 
 export default function App() {
   const [cvOpen, setCvOpen] = useState(false)
-  const [activeProject, setActiveProject] = useState<Project | null>(null)
+  const [hoveredCategory, setHoveredCategory] = useState<Category | null>(null)
+  const [sixSevenReservedAreas, setSixSevenReservedAreas] = useState<ReservedArea[]>([])
+  const onCategoryHover = useCallback((category: Category, active: boolean) => {
+    setHoveredCategory(current => active ? category : current?.id === category.id ? null : current)
+  }, [])
+  const [activeProject, setActiveProject] = useState<Category | null>(null)
   const [closing, setClosing] = useState(false)
   const [flight, setFlight] = useState<Flight | null>(null)
   const [jarEffect, setJarEffect] = useState<JarEffect | null>(null)
@@ -76,14 +83,16 @@ export default function App() {
     if (!shell) return
     const measure = () => {
       const shellRect = shell.getBoundingClientRect()
-      // Only the invisible placement anchors inherit the jars' transforms.
-      // The independent number layer uses these centers in shell coordinates.
+      // Use layout offsets before transforms: jar rotation must never change
+      // the number's position, even when the viewport or image size changes.
       setNumberPositions(Array.from(shell.querySelectorAll<HTMLElement>('.jar-index-anchor'), label => {
-        const rect = label.getBoundingClientRect()
+        const button = label.closest<HTMLElement>('.jar-button')!
+        const origin = (button.offsetParent as HTMLElement).getBoundingClientRect()
+        const scale = Number(button.style.getPropertyValue('--scale')) || 1
         return {
           number: label.textContent ?? '',
-          x: rect.left + rect.width / 2 - shellRect.left,
-          y: rect.top + rect.height / 2 - shellRect.top,
+          x: origin.left + button.offsetLeft + (label.offsetLeft + label.offsetWidth / 2 - button.offsetWidth / 2) * scale - shellRect.left,
+          y: origin.top + button.offsetTop + (label.offsetTop + label.offsetHeight / 2 - button.offsetHeight / 2) * scale - shellRect.top,
         }
       }))
     }
@@ -106,8 +115,9 @@ export default function App() {
   useEffect(() => { document.body.style.overflow = activeProject || cvOpen ? 'hidden' : ''; return () => { document.body.style.overflow = '' } }, [activeProject, cvOpen])
 
   const later = (fn: () => void, delay: number) => { timers.current.push(setTimeout(fn, delay)) }
-  const openProject = (project: Project, rect: DOMRect) => {
+  const openProject = (project: Category, rect: DOMRect) => {
     if (activeProject || flight || jarEffect) return
+    setHoveredCategory(null)
     setCvOpen(false)
     lastRect.current = rect
     if (reducedMotion) { setActiveProject(project); return }
@@ -146,30 +156,31 @@ export default function App() {
   }, [activeProject, reducedMotion])
 
   const flightStyle = flight ? {
-    left: flight.rect.left + flight.rect.width / 2,
-    top: flight.rect.top + flight.rect.height / 2,
-    '--fly-x': `${window.innerWidth / 2 - (flight.rect.left + flight.rect.width / 2)}px`,
-    '--fly-y': `${window.innerHeight / 2 - (flight.rect.top + flight.rect.height / 2)}px`,
-    '--fly-scale': Math.hypot(window.innerWidth, window.innerHeight) / 60 * 1.35,
+    '--fly-start-x': `${flight.rect.left + flight.rect.width / 2}px`,
+    '--fly-start-y': `${flight.rect.top + flight.rect.height / 2}px`,
+    '--fly-start-size': `${Math.max(flight.rect.width, flight.rect.height)}px`,
+    '--fly-end-size': `${Math.hypot(window.innerWidth, window.innerHeight) * 1.35}px`,
   } as CSSProperties : undefined
 
   return <>
-    <div ref={shellRef} className={`site-shell${inverted ? ' is-inverted' : ''}${pairActive || pairDigitsAway ? ' six-seven-active' : ''}`} style={{ '--reveal-x': revealOrigin.x, '--reveal-y': revealOrigin.y, '--reveal-radius': revealOrigin.radius } as CSSProperties}>
+    <div ref={shellRef} inert={cvOpen || Boolean(activeProject)} className={`site-shell${inverted ? ' is-inverted' : ''}${pairActive || pairDigitsAway ? ' six-seven-active' : ''}`} style={{ '--stage-height': desktopStageHeight + 'px', '--mobile-stage-height': mobileStageHeight + 'px', '--reveal-x': revealOrigin.x, '--reveal-y': revealOrigin.y, '--reveal-radius': revealOrigin.radius } as CSSProperties}>
       <div className="color-reveal" aria-hidden="true" />
-      <div className="jar-indices" aria-hidden="true">{numberPositions.map(({ number, x, y }) => <span className="jar-index" key={number} data-jar-number={number} style={{ left: x, top: y }}><span>{number[0]}</span><span className="jar-index-last"><i className="jar-index-baseline" />{number[1]}</span></span>)}</div>
-      <header className="site-header"><button type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT / CV <span aria-hidden="true">↗</span></button></header>
+      <div className="jar-indices" aria-hidden="true">{numberPositions.map(({ number, x, y }) => <span className="jar-index" key={number} data-jar-number={number} style={{ left: x, top: y }}><span>{number.slice(0, -1)}</span><span className="jar-index-last"><i className="jar-index-baseline" />{number.slice(-1)}</span></span>)}</div>
+      <header className="site-header"><button type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT <span aria-hidden="true">↗</span></button></header>
       <section className="home" aria-label="Selected portfolio projects">
         <div className="home-stage">
-          <NikaTitle titleRef={titleRef} onReveal={startReveal} onConceal={() => setInverted(false)} onOpen={() => setCvOpen(true)} />
-          <div className="jar-scene">{jars.map(jar => <Jar key={jar.id} jar={jar} project={projects.find(p => p.id === jar.projectId)!} effect={jarEffect?.id === jar.projectId ? jarEffect.phase : null} onOpen={openProject} onEraser={onEraser} onPairHover={onPairHover} />)}</div>
+          <VeronicaTitle titleRef={titleRef} onReveal={startReveal} onConceal={() => setInverted(false)} onOpen={() => setCvOpen(true)} />
+          <div className="jar-scene">{jars.map(jar => <Jar key={jar.id} jar={jar} project={categories.find(category => category.id === jar.categoryId)!} effect={jarEffect?.id === jar.categoryId ? jarEffect.phase : null} onOpen={openProject} onEraser={onEraser} onPairHover={onPairHover} onCategoryHover={onCategoryHover} />)}</div>
+          {categories.length === 0 && <p className="archive-empty">The archive is being prepared.</p>}
         </div>
       </section>
-      <footer className="site-footer"><span>© VERONICA CHEREPKO / 2026</span></footer>
+      {hoveredCategory && !cvOpen && !activeProject && !flight && !jarEffect && <CategoryLabel key={hoveredCategory.id} category={hoveredCategory} shellRef={shellRef} reservedAreas={sixSevenReservedAreas} />}
+      <footer className="site-footer"><span>© Veronica Cherepko / 2026</span></footer>
     </div>
-    <SixSevenEffect active={pairActive} returning={pairDigitsAway && !pairActive} shellRef={shellRef} />
+    <SixSevenEffect active={pairActive} returning={pairDigitsAway && !pairActive} shellRef={shellRef} onReservedAreasChange={setSixSevenReservedAreas} />
     <CVPanel open={cvOpen} onClose={() => setCvOpen(false)} />
     {activeProject && <ProjectView project={activeProject} closing={closing} onClose={closeProject} />}
-    {flight && <div className={`flight-berry flight-${flight.phase}`} style={flightStyle} aria-hidden="true"><i /></div>}
+    {flight && <img src={blueberryUrl} alt="" draggable="false" className={`flight-berry flight-${flight.phase}`} style={flightStyle} aria-hidden="true" />}
     <CustomCursor erasing={erasing} />
   </>
 }

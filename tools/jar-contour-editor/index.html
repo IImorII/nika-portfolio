@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Контуры банок</title><link rel="stylesheet" href="/styles.css"></head>
+<body>
+  <header><div><p class="eyebrow">ЛОКАЛЬНЫЙ РЕДАКТОР</p><h1>Контуры банок</h1></div><span class="badge">7 банок · без поворотов</span></header>
+  <main>
+    <p class="intro">Перетаскивайте точки, чтобы изменить зону полёта частиц. Двойной щелчок по линии добавляет вершину. Выбранную точку можно двигать стрелками или задать её координаты ниже.</p>
+    <p class="legend"><span class="solid"></span> Граница полёта частиц <span class="dashed"></span> Исходный контур для сравнения</p>
+    <p id="page-status" role="status">Загружаем банки…</p>
+    <div id="jars" class="grid"></div>
+    <p class="footer">Save сохраняет контур в settings.json выбранной банки. Чтобы увидеть результат на сайте, пересоберите приложение.</p>
+  </main>
+  <dialog id="zoom"><button id="close-zoom" class="close" aria-label="Закрыть крупный просмотр">Закрыть ×</button><div id="zoom-content"></div></dialog>
+  <script type="module" src="/app.js"></script>
+</body></html>

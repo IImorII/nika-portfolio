@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, RefObject } from 'react'
 
+export type ReservedArea = { left: number; top: number; right: number; bottom: number }
+
 type Digit = { value: string; x: number; y: number; fontSize: number; dx: number; dy: number; scale: number; targetScale: number; color: string }
 type Layout = { left: number; top: number; size: number; rise: number; digits: Digit[] }
 
@@ -8,7 +10,7 @@ type Layout = { left: number; top: number; size: number; rise: number; digits: D
 const PALMS = [{ x: .25, y: .566, font: .32 }, { x: .805, y: .532, font: .37 }]
 const IMAGE_ASPECT = 1263 / 1245
 
-export default function SixSevenEffect({ active, returning, shellRef }: { active: boolean; returning: boolean; shellRef: RefObject<HTMLDivElement | null> }) {
+export default function SixSevenEffect({ active, returning, shellRef, onReservedAreasChange }: { active: boolean; returning: boolean; shellRef: RefObject<HTMLDivElement | null>; onReservedAreasChange: (areas: ReservedArea[]) => void }) {
   const [layout, setLayout] = useState<Layout | null>(null)
   const frame = useRef(0)
 
@@ -48,6 +50,21 @@ export default function SixSevenEffect({ active, returning, shellRef }: { active
           color: shell.classList.contains('is-inverted') ? '#fff' : '#000' }
       })
       setLayout({ left, top, size, rise: window.innerHeight - top + size * .1, digits })
+      // Reserve the whole swept area even while hidden, so labels do not jump
+      // into the smiley's entrance/exit or the digits' flight paths.
+      const padding = 14
+      const areas: ReservedArea[] = [{ left: left - padding, top: top - padding,
+        right: left + size + padding, bottom: Math.max(window.innerHeight, top + size * IMAGE_ASPECT) + padding }]
+      digits.forEach(digit => {
+        const targetFontSize = digit.fontSize * digit.targetScale
+        areas.push({
+          left: Math.min(digit.x, digit.x + digit.dx) - padding,
+          top: Math.min(digit.y - digit.fontSize, digit.y + digit.dy - targetFontSize) - padding,
+          right: Math.max(digit.x + digit.fontSize, digit.x + digit.dx + targetFontSize) + padding,
+          bottom: Math.max(digit.y + digit.fontSize * .25, digit.y + digit.dy + targetFontSize * .25) + padding,
+        })
+      })
+      onReservedAreasChange(areas)
     }
     const schedule = () => { cancelAnimationFrame(frame.current); frame.current = requestAnimationFrame(measure) }
     const observer = new ResizeObserver(schedule)
@@ -57,7 +74,7 @@ export default function SixSevenEffect({ active, returning, shellRef }: { active
     window.addEventListener('scroll', schedule, { passive: true })
     measure()
     return () => { cancelAnimationFrame(frame.current); observer.disconnect(); window.removeEventListener('resize', schedule); window.removeEventListener('scroll', schedule) }
-  }, [shellRef, active])
+  }, [shellRef, active, onReservedAreasChange])
 
   if (!layout) return null
   return <div className={`six-seven-effect${active ? ' is-active' : ''}${returning ? ' is-returning' : ''}`} aria-hidden="true">

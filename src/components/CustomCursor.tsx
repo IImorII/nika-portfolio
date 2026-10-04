@@ -10,6 +10,11 @@ export default function CustomCursor({ erasing }: { erasing: boolean }) {
     const move = (event: MouseEvent) => {
       targetX = event.clientX
       targetY = event.clientY
+      // Navigation needs the visible cursor to match the actual click position.
+      if ((event.target as Element)?.closest('.project-tabs, .category-links')) {
+        x = targetX
+        y = targetY
+      }
       element.classList.add('cursor-visible')
       element.classList.toggle('cursor-active', !!(event.target as Element)?.closest('[data-interactive]'))
     }

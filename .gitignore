@@ -3,3 +3,5 @@ dist/
 .npm-cache/
 *.tsbuildinfo
 .DS_Store
+temp/
+.env*

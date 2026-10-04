@@ -1,0 +1,274 @@
+{
+  "source": "jar-6.psd",
+  "width": 1254,
+  "height": 1254,
+  "layers": [
+    {
+      "file": "layer_1.webp",
+      "source": "Layer 10",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_2.webp",
+      "source": "Layer 26",
+      "blendMode": "multiply",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_3.webp",
+      "source": "Layer 12",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_4.webp",
+      "source": "Layer 13",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_5.webp",
+      "source": "Layer 14",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_6.webp",
+      "source": "Layer 15",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_7.webp",
+      "source": "Layer 16",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_8.webp",
+      "source": "Layer 17",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_9.webp",
+      "source": "Layer 18",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_10.webp",
+      "source": "Layer 19",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_11.webp",
+      "source": "Layer 20",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_12.webp",
+      "source": "Layer 21",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_13.webp",
+      "source": "Layer 22",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_14.webp",
+      "source": "Layer 23",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_15.webp",
+      "source": "Layer 24",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_16.webp",
+      "source": "Layer 25",
+      "blendMode": "normal",
+      "clippingBaked": false,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_17.webp",
+      "source": "Vector Smart Object",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "sources": [
+        "Vector Smart Object",
+        "Layer 3",
+        "Color Fill 1"
+      ],
+      "placement": "foreground"
+    },
+    {
+      "file": "layer_18.webp",
+      "source": "Layer 6",
+      "blendMode": "normal",
+      "clippingBaked": false,
+      "placement": "foreground"
+    },
+    {
+      "file": "layer_19.webp",
+      "source": "Layer 27",
+      "blendMode": "multiply",
+      "clippingBaked": false,
+      "placement": "foreground"
+    },
+    {
+      "file": "layer_20.webp",
+      "source": "Layer 9",
+      "blendMode": "normal",
+      "clippingBaked": false,
+      "placement": "foreground"
+    }
+  ],
+  "omitted": [
+    {
+      "source": "Color Fill 2",
+      "reason": "background"
+    },
+    {
+      "source": "Layer 2",
+      "reason": "hidden"
+    },
+    {
+      "source": "Layer 4",
+      "reason": "hidden"
+    },
+    {
+      "source": "Layer 5",
+      "reason": "hidden"
+    },
+    {
+      "source": "Layer 7",
+      "reason": "hidden"
+    },
+    {
+      "source": "Layer 8",
+      "reason": "hidden"
+    }
+  ],
+  "glassPolygon": [
+    [
+      0.18,
+      0.35
+    ],
+    [
+      0.27,
+      0.36
+    ],
+    [
+      0.36,
+      0.39
+    ],
+    [
+      0.43,
+      0.38
+    ],
+    [
+      0.5,
+      0.4
+    ],
+    [
+      0.59,
+      0.41
+    ],
+    [
+      0.68,
+      0.38
+    ],
+    [
+      0.73,
+      0.38
+    ],
+    [
+      0.8,
+      0.54
+    ],
+    [
+      0.85,
+      0.54
+    ],
+    [
+      0.86,
+      0.62
+    ],
+    [
+      0.84,
+      0.74
+    ],
+    [
+      0.79,
+      0.85
+    ],
+    [
+      0.72,
+      0.91
+    ],
+    [
+      0.61,
+      0.94
+    ],
+    [
+      0.4,
+      0.94
+    ],
+    [
+      0.29,
+      0.91
+    ],
+    [
+      0.22,
+      0.87
+    ],
+    [
+      0.16,
+      0.78
+    ],
+    [
+      0.12,
+      0.65
+    ],
+    [
+      0.12,
+      0.5
+    ],
+    [
+      0.14,
+      0.41
+    ]
+  ],
+  "base": {
+    "file": "base.webp",
+    "source": "Layer 11",
+    "blendMode": "normal",
+    "clippingBaked": false
+  }
+}

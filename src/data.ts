@@ -1,54 +1,117 @@
-export type JarShape = 'mason' | 'tall' | 'squat' | 'wide' | 'hex' | 'bottle' | 'ribbed' | 'round'
+import catalog from 'virtual:portfolio-assets'
 
-export interface Project {
+export interface PortfolioMedia {
+  name: string
+  path: string
+  kind: 'image' | 'video'
+  priority?: number
+}
+
+export interface PortfolioProject {
+  id: string
+  title: string
+  media: PortfolioMedia[]
+  sections: { id: string; media: PortfolioMedia[] }[]
+  copyright?: { text: string; font?: string; size?: number; color?: string }
+}
+
+export interface JarSettings {
+  scale?: number
+  rotation?: number
+  position?: { x?: number; y?: number }
+  mobilePosition?: { x?: number; y?: number }
+  indexAnchor?: { x: number; y: number }
+  seed?: number
+  particleCount?: number
+  blueberryCount?: number | null
+  blueberrySize?: number
+  particleSize?: number
+  particleColor?: string
+  particleZone?: import('./jar-geometry').ParticleZone
+}
+
+export interface Category {
   id: string
   number: string
   title: string
-  year: string
-  type: string
-  description: string
-  images: string[]
-  accent: string
+  jarPath: string
+  jarLayers: { path: string; blendMode: 'normal' | 'multiply' | 'lighten' | 'luminosity' | 'color-burn'; placement?: 'interior' | 'foreground' }[]
+  glassPolygon?: import('./jar-geometry').GlassPolygon
+  jarSettings: JarSettings
+  projects: PortfolioProject[]
 }
 
 export interface JarConfig {
   id: string
-  projectId: string
-  shape: JarShape
+  categoryId: string
+  image: string
+  layers: { image: string; blendMode: 'normal' | 'multiply' | 'lighten' | 'luminosity' | 'color-burn'; placement?: 'interior' | 'foreground' }[]
+  glassPolygon?: import('./jar-geometry').GlassPolygon
   rotation: number
   scale: number
   x: number
   y: number
   mobileX: number
   mobileY: number
+  indexAnchor?: { x: number; y: number }
   seed: number
   particleCount: number
+  blueberryCount?: number
+  blueberrySize?: number
+  particleSize: number
+  particleColor: string
+  particleZone?: import('./jar-geometry').ParticleZone
 }
 
-// Replace demo projects and /public/projects images here when the real portfolio is ready.
-export const projects: Project[] = Array.from({ length: 8 }, (_, index) => {
-  const number = String(index + 1).padStart(2, '0')
-  const types = ['Identity', 'Editorial', 'Campaign', 'Packaging', 'Art direction', 'Digital', 'Photography', 'Objects']
+export const assetUrl = (path: string) => import.meta.env.BASE_URL + path
+export const blueberryUrl = assetUrl('blueberries/base.svg')
+export const blueberrySplashUrl = assetUrl('blueberries/splash.svg')
+export const categories: Category[] = catalog.map((category, index) => ({
+  ...category, number: String(index + 1).padStart(2, '0'),
+}))
+
+// Balanced rows above and below the central title, without a fixed category limit.
+const rowCount = Math.max(2, Math.ceil(categories.length / 4))
+const mobileRows = Math.max(2, Math.ceil(categories.length / 2))
+const stageHeightFor = (rows: number, mobile: boolean) => mobile
+  ? Math.max(740, Math.ceil(rows / 2) * 400 + 220)
+  : rows === 2 ? 540 : Math.ceil(rows / 2) * 560 + 220
+function position(index: number, rows: number, mobile = false) {
+  const columns = Math.ceil(categories.length / rows)
+  const row = Math.floor(index / columns)
+  const count = Math.min(columns, categories.length - row * columns)
+  const upperRows = Math.ceil(rows / 2)
+  const upper = row < upperRows
+  const stageHeight = stageHeightFor(rows, mobile)
+  const gap = 220
+  const bandHeight = (stageHeight - gap) / 2
+  const localRow = upper ? row : row - upperRows
+  const bandRows = upper ? upperRows : rows - upperRows
   return {
-    id: `project-${number}`,
-    number,
-    title: `Project ${number}`,
-    year: '20—',
-    type: types[index],
-    description: 'A space for the story behind this project. Add the concept, collaborators, role and outcome here when the work is ready to share.',
-    images: [`${import.meta.env.BASE_URL}projects/study-${(index % 4) + 1}.svg`, `${import.meta.env.BASE_URL}projects/study-${((index + 1) % 4) + 1}.svg`],
-    accent: ['#ccd3b9', '#d9b8ac', '#c9c8dd', '#ecd5a8', '#b8ccd1', '#d5c5a8', '#c4ccaa', '#d6bdbb'][index],
+    x: (index % columns + .5) * 100 / count,
+    y: ((localRow + .5) * bandHeight / bandRows + (upper ? 0 : bandHeight + gap)) / stageHeight * 100,
+  }
+}
+
+export const jars: JarConfig[] = categories.map((category, index) => {
+  const desktop = position(index, rowCount)
+  const mobile = position(index, mobileRows, true)
+  const settings = category.jarSettings
+  return {
+    id: `jar-${category.number}`, categoryId: category.id, image: assetUrl(category.jarPath),
+    layers: category.jarLayers.map(layer => ({ image: assetUrl(layer.path), blendMode: layer.blendMode, placement: layer.placement })),
+    glassPolygon: category.glassPolygon,
+    rotation: settings.rotation ?? (index * 47 % 61) - 30, scale: settings.scale ?? 1,
+    x: settings.position?.x ?? desktop.x, y: settings.position?.y ?? desktop.y,
+    mobileX: settings.mobilePosition?.x ?? mobile.x, mobileY: settings.mobilePosition?.y ?? mobile.y,
+    indexAnchor: settings.indexAnchor,
+    seed: settings.seed ?? 11 + index * 13, particleCount: settings.particleCount ?? 11,
+    blueberryCount: settings.blueberryCount ?? undefined, blueberrySize: settings.blueberrySize,
+    particleSize: settings.particleSize ?? 1, particleColor: settings.particleColor ?? '#ff8b10',
+    particleZone: settings.particleZone,
   }
 })
 
-// Coordinates are percentages of the desktop and mobile composition canvases.
-export const jars: JarConfig[] = [
-  { id: 'jar-01', projectId: 'project-01', shape: 'tall', rotation: -12, scale: 1.04, x: 10, y: 20, mobileX: 24, mobileY: 12, seed: 11, particleCount: 11 },
-  { id: 'jar-02', projectId: 'project-02', shape: 'squat', rotation: 24, scale: .94, x: 30, y: 13, mobileX: 70, mobileY: 9, seed: 23, particleCount: 12 },
-  { id: 'jar-03', projectId: 'project-03', shape: 'bottle', rotation: 76, scale: 1.04, x: 59, y: 18, mobileX: 26, mobileY: 31, seed: 37, particleCount: 10 },
-  { id: 'jar-04', projectId: 'project-04', shape: 'round', rotation: -18, scale: 1.01, x: 85, y: 20, mobileX: 78, mobileY: 30, seed: 43, particleCount: 12 },
-  { id: 'jar-05', projectId: 'project-05', shape: 'wide', rotation: 66, scale: 1.07, x: 13, y: 74, mobileX: 26, mobileY: 64, seed: 59, particleCount: 11 },
-  { id: 'jar-06', projectId: 'project-06', shape: 'mason', rotation: -22, scale: 1.05, x: 31, y: 82, mobileX: 72, mobileY: 65, seed: 61, particleCount: 11 },
-  { id: 'jar-07', projectId: 'project-07', shape: 'hex', rotation: 14, scale: 1.03, x: 62, y: 77, mobileX: 25, mobileY: 85, seed: 79, particleCount: 10 },
-  { id: 'jar-08', projectId: 'project-08', shape: 'ribbed', rotation: -85, scale: .99, x: 87, y: 72, mobileX: 74, mobileY: 88, seed: 83, particleCount: 12 },
-]
+// Two desktop rows fit the viewport; larger archives reserve scrollable space.
+export const desktopStageHeight = rowCount === 2 ? 0 : stageHeightFor(rowCount, false)
+export const mobileStageHeight = stageHeightFor(mobileRows, true)

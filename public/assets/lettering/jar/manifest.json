@@ -1,0 +1,192 @@
+{
+  "source": "jar-7.psd",
+  "width": 1254,
+  "height": 1254,
+  "layers": [
+    {
+      "file": "layer_1.webp",
+      "source": "Layer 6",
+      "blendMode": "normal",
+      "clippingBaked": false,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_2.webp",
+      "source": "Layer 7",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_3.webp",
+      "source": "Layer 11",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_4.webp",
+      "source": "Layer 12",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_5.webp",
+      "source": "Layer 13",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_6.webp",
+      "source": "Layer 14",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_7.webp",
+      "source": "Layer 8",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_8.webp",
+      "source": "Layer 9",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_9.webp",
+      "source": "Layer 10",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_10.webp",
+      "source": "Layer 15",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_11.webp",
+      "source": "Layer 16",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_12.webp",
+      "source": "Layer 17",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_13.webp",
+      "source": "Layer 18",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_14.webp",
+      "source": "Layer 4",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_15.webp",
+      "source": "Layer 5",
+      "blendMode": "normal",
+      "clippingBaked": true,
+      "placement": "interior"
+    },
+    {
+      "file": "layer_16.webp",
+      "source": "Vector Smart Object",
+      "blendMode": "normal",
+      "clippingBaked": false,
+      "placement": "foreground"
+    },
+    {
+      "file": "layer_17.webp",
+      "source": "Layer 2",
+      "blendMode": "normal",
+      "clippingBaked": false,
+      "placement": "foreground"
+    },
+    {
+      "file": "layer_18.webp",
+      "source": "Layer 21",
+      "blendMode": "normal",
+      "clippingBaked": false,
+      "sourceBlendMode": "DARKER_COLOR",
+      "blendBaked": true,
+      "placement": "foreground"
+    },
+    {
+      "file": "layer_19.webp",
+      "source": "Layer 20",
+      "blendMode": "normal",
+      "clippingBaked": false,
+      "placement": "foreground"
+    }
+  ],
+  "omitted": [
+    {
+      "source": "Layer 3",
+      "reason": "hidden"
+    }
+  ],
+  "glassPolygon": [
+    [
+      0.19,
+      0.57
+    ],
+    [
+      0.36,
+      0.59
+    ],
+    [
+      0.5,
+      0.51
+    ],
+    [
+      0.68,
+      0.53
+    ],
+    [
+      0.79,
+      0.55
+    ],
+    [
+      0.81,
+      0.77
+    ],
+    [
+      0.75,
+      0.87
+    ],
+    [
+      0.28,
+      0.87
+    ],
+    [
+      0.19,
+      0.79
+    ]
+  ],
+  "base": {
+    "file": "base.webp",
+    "source": "Layer 1",
+    "blendMode": "normal",
+    "clippingBaked": false
+  }
+}
