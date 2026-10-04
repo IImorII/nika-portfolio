@@ -10,7 +10,7 @@ function ProjectCopyright({ copyright }: { copyright: PortfolioProject['copyrigh
   return <p className="project-copyright" style={{ fontFamily: copyright.font ?? 'Helvetica, Arial, sans-serif', fontSize: copyright.size ?? 12, color: copyright.color ?? '#75736e' }}>{copyright.text}</p>
 }
 
-function AnimatedVideo({ src, label, playing = true, onRatio }: { src: string; label: string; playing?: boolean; onRatio?: (ratio: number) => void }) {
+function AnimatedVideo({ src, label, playing = true }: { src: string; label: string; playing?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   useEffect(() => {
     const video = videoRef.current
@@ -21,9 +21,7 @@ function AnimatedVideo({ src, label, playing = true, onRatio }: { src: string; l
   }, [src, playing])
   return <video ref={videoRef} src={src} loop muted playsInline preload="metadata" aria-label={label}
     onLoadedMetadata={event => {
-      const video = event.currentTarget
-      if (video.videoWidth && video.videoHeight) onRatio?.(video.videoWidth / video.videoHeight)
-      if (playing) void video.play().catch(() => {})
+      if (playing) void event.currentTarget.play().catch(() => {})
     }} />
 }
 
@@ -39,9 +37,6 @@ export default function ProjectView({ project: initialCategory, closing, onClose
   const [sectionIndex, setSectionIndex] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
-  const [ratios, setRatios] = useState<Record<string, number>>({})
-  const pendingRatios = useRef<Record<string, number>>({})
-  const ratioFrame = useRef(0)
   const project = category.projects[projectIndex]
   const sections = project?.sections ?? []
   const section = sections[sectionIndex]
@@ -66,18 +61,7 @@ export default function ProjectView({ project: initialCategory, closing, onClose
   }, [allMedia.length])
   const sectionSwipe = useSwipeNavigation(changeSection)
   const mediaSwipe = useSwipeNavigation(changeMedia)
-  const recordRatio = useCallback((path: string, ratio: number) => {
-    if (!Number.isFinite(ratio) || ratio <= 0) return
-    pendingRatios.current[path] = ratio
-    if (!ratioFrame.current) ratioFrame.current = requestAnimationFrame(() => {
-      const pending = pendingRatios.current
-      pendingRatios.current = {}
-      ratioFrame.current = 0
-      setRatios(previous => Object.entries(pending).every(([path, ratio]) => previous[path] === ratio) ? previous : { ...previous, ...pending })
-    })
-  }, [])
-  useEffect(() => () => cancelAnimationFrame(ratioFrame.current), [])
-  const layout = useMemo(() => packWorks((media ?? []).map(item => ratios[item.path] ?? 1), size.width, size.height, size.width < 600 ? 6 : 10, (media ?? []).map(item => item.priority)), [media, ratios, size])
+  const layout = useMemo(() => packWorks((media ?? []).map(item => item.width / item.height), size.width, size.height, size.width < 600 ? 6 : 10, (media ?? []).map(item => item.priority)), [media, size])
 
   useLayoutEffect(() => {
     const stage = stageRef.current
@@ -157,8 +141,8 @@ export default function ProjectView({ project: initialCategory, closing, onClose
                 setSelected(allMedia.findIndex(media => media.path === item.path))
               }}>
               {item.kind === 'video'
-                ? <AnimatedVideo src={assetUrl(item.path)} label={label} playing={!viewerOpen} onRatio={ratio => recordRatio(item.path, ratio)} />
-                : <img src={assetUrl(item.path)} alt={label} decoding="async" onLoad={event => recordRatio(item.path, event.currentTarget.naturalWidth / event.currentTarget.naturalHeight)} />}
+                ? <AnimatedVideo src={assetUrl(item.path)} label={label} playing={!viewerOpen} />
+                : <img src={assetUrl(item.path)} alt={label} width={item.width} height={item.height} decoding="async" />}
             </button>
           }) : <p className="work-empty">Works coming soon.</p>}
         </div>
@@ -178,7 +162,7 @@ export default function ProjectView({ project: initialCategory, closing, onClose
     </div>
     {current && <div className="media-viewer" role="dialog" aria-modal="true" aria-label={project.title}>
       <header><span>{project.title}</span><button ref={viewerCloseRef} className="icon-button" type="button" onClick={() => setSelected(null)} data-interactive="true" aria-label="Close fullscreen">×</button></header>
-      <div className="media-viewer-stage" {...mediaSwipe}>{current.kind === 'video' ? <AnimatedVideo key={current.path} src={assetUrl(current.path)} label={project.title} /> : <img src={assetUrl(current.path)} alt={project.title} decoding="async" draggable="false" />}</div>
+      <div className="media-viewer-stage" {...mediaSwipe}>{current.kind === 'video' ? <AnimatedVideo key={current.path} src={assetUrl(current.path)} label={project.title} /> : <img src={assetUrl(current.path)} alt={project.title} width={current.width} height={current.height} decoding="async" draggable="false" />}</div>
       <footer><nav className="media-viewer-navigation" aria-label="Works">{allMedia.length > 1 && <><button className="icon-button" type="button" onClick={() => changeMedia(-1)} data-interactive="true" aria-label="Previous work">←</button><span className="media-position" aria-live="polite" aria-atomic="true">{selected! + 1} / {allMedia.length}</span><button className="icon-button" type="button" onClick={() => changeMedia(1)} data-interactive="true" aria-label="Next work">→</button></>}</nav><ProjectCopyright copyright={project.copyright} /></footer>
     </div>}
   </main>

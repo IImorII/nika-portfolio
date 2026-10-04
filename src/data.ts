@@ -4,6 +4,8 @@ export interface PortfolioMedia {
   name: string
   path: string
   kind: 'image' | 'video'
+  width: number
+  height: number
   priority?: number
 }
 

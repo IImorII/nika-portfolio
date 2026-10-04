@@ -213,7 +213,7 @@ button:focus-visible{outline:2px solid #1b1b18;outline-offset:5px}
 .work-stage.has-sections{--arrow-rail:clamp(48px,5vw,72px)}
 .work-slide{position:absolute;inset:0 var(--arrow-rail);display:grid;animation:work-slide-in .24s ease-out both}
 .section-arrow{position:absolute;top:50%;translate:0 -50%;z-index:2;display:grid;place-items:center;width:clamp(44px,4vw,56px);height:clamp(44px,4vw,56px);border:0;border-radius:50%;background:#151513;color:#fff;font-size:28px;line-height:1;font-weight:600;padding:0;box-shadow:0 3px 12px #15151326;transition:background .15s,scale .15s}
-.section-arrow-prev{left:0}.section-arrow-next{right:0}
+.section-arrow-prev{left:4px}.section-arrow-next{right:4px}
 .section-arrow:hover{background:#3a3d6e;scale:1.06}
 .section-arrow:active{scale:.94}
 .section-arrow:focus-visible{outline-offset:-5px;outline-color:#fff}
