@@ -8,6 +8,7 @@ import CVPanel from './components/CVPanel'
 import ProjectView from './components/ProjectView'
 import VeronicaTitle from './components/VeronicaTitle'
 import CategoryLabel from './components/CategoryLabel'
+import ThemeToggle from './components/ThemeToggle'
 import SixSevenEffect from './components/SixSevenEffect'
 import type { ReservedArea } from './components/SixSevenEffect'
 
@@ -23,6 +24,12 @@ const JAR_REASSEMBLE = 1050
 const MOBILE_VIEW = '(max-width: 650px), (pointer: coarse), (max-height: 500px) and (max-width: 980px)'
 
 export default function App() {
+  const [darkTheme, setDarkTheme] = useState(() => document.documentElement.dataset.theme === 'dark')
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = darkTheme ? 'dark' : 'light'
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', darkTheme ? '#000000' : '#ffffff')
+    try { localStorage.setItem('veronica-theme', darkTheme ? 'dark' : 'light') } catch { /* Theme still works when storage is unavailable. */ }
+  }, [darkTheme])
   const [cvOpen, setCvOpen] = useState(false)
   const [hoveredCategory, setHoveredCategory] = useState<Category | null>(null)
   const [sixSevenReservedAreas, setSixSevenReservedAreas] = useState<ReservedArea[]>([])
@@ -199,7 +206,10 @@ export default function App() {
     <div ref={shellRef} inert={cvOpen || Boolean(activeProject)} className={`site-shell${activeProject ? ' project-open' : ''}${mobileView ? ' mobile-static' : ''}${inverted ? ' is-inverted' : ''}${pairActive || pairDigitsAway ? ' six-seven-active' : ''}`} style={{ '--stage-height': desktopStageHeight + 'px', '--mobile-stage-height': mobileStageHeight + 'px', '--reveal-x': revealOrigin.x, '--reveal-y': revealOrigin.y, '--reveal-radius': revealOrigin.radius } as CSSProperties}>
       <div className="color-reveal" aria-hidden="true" />
       <div className="jar-indices" aria-hidden="true">{numberPositions.map(({ number, x, y }) => <span className="jar-index" key={number} data-jar-number={number} style={{ left: x, top: y }}><span>{number.slice(0, -1)}</span><span className="jar-index-last"><i className="jar-index-baseline" />{number.slice(-1)}</span></span>)}</div>
-      <header className="site-header"><button type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT <span aria-hidden="true">↗</span></button></header>
+      <header className="site-header">
+        <button className="about-button" type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT <span aria-hidden="true">↗</span></button>
+        <ThemeToggle dark={darkTheme} onToggle={() => setDarkTheme(current => !current)} />
+      </header>
       <section className="home" aria-label="Selected portfolio projects">
         <div className="home-stage">
           <VeronicaTitle titleRef={titleRef} onReveal={startReveal} onConceal={() => setInverted(false)} onOpen={() => setCvOpen(true)} />
@@ -210,7 +220,7 @@ export default function App() {
       {hoveredCategory && !cvOpen && !activeProject && !flight && !jarEffect && <CategoryLabel key={hoveredCategory.id} category={hoveredCategory} shellRef={shellRef} reservedAreas={sixSevenReservedAreas} />}
       <footer className="site-footer"><span>© Veronica Cherepko / 2026</span></footer>
     </div>
-    {!activeProject && <SixSevenEffect active={pairActive} returning={pairDigitsAway && !pairActive} shellRef={shellRef} onReservedAreasChange={setSixSevenReservedAreas} />}
+    {!activeProject && <SixSevenEffect active={pairActive} returning={pairDigitsAway && !pairActive} dark={darkTheme !== inverted} shellRef={shellRef} onReservedAreasChange={setSixSevenReservedAreas} />}
     <CVPanel open={cvOpen} onClose={() => setCvOpen(false)} />
     {activeProject && <ProjectView project={activeProject} closing={closing} instant={instantProjects} onClose={closeProject} />}
     {flight && <img src={blueberryUrl} alt="" draggable="false" className={`flight-berry flight-${flight.phase}`} style={flightStyle} aria-hidden="true" />}

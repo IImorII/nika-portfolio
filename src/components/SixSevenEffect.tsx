@@ -10,7 +10,7 @@ type Layout = { left: number; top: number; size: number; rise: number; digits: D
 const PALMS = [{ x: .25, y: .566, font: .32 }, { x: .805, y: .532, font: .37 }]
 const IMAGE_ASPECT = 1263 / 1245
 
-export default function SixSevenEffect({ active, returning, shellRef, onReservedAreasChange }: { active: boolean; returning: boolean; shellRef: RefObject<HTMLDivElement | null>; onReservedAreasChange: (areas: ReservedArea[]) => void }) {
+export default function SixSevenEffect({ active, returning, dark, shellRef, onReservedAreasChange }: { active: boolean; returning: boolean; dark: boolean; shellRef: RefObject<HTMLDivElement | null>; onReservedAreasChange: (areas: ReservedArea[]) => void }) {
   const [layout, setLayout] = useState<Layout | null>(null)
   const frame = useRef(0)
 
@@ -47,7 +47,7 @@ export default function SixSevenEffect({ active, returning, shellRef, onReserved
           dx: left + size * palm.x - advance / 2 - x,
           dy: top + size * IMAGE_ASPECT * palm.y - descent - y,
           scale: 1, targetScale: targetFontSize / fontSize,
-          color: shell.classList.contains('is-inverted') ? '#fff' : '#000' }
+          color: dark ? '#fff' : '#000' }
       })
       setLayout({ left, top, size, rise: window.innerHeight - top + size * .1, digits })
       // Reserve the whole swept area even while hidden, so labels do not jump
@@ -74,7 +74,7 @@ export default function SixSevenEffect({ active, returning, shellRef, onReserved
     window.addEventListener('scroll', schedule, { passive: true })
     measure()
     return () => { cancelAnimationFrame(frame.current); observer.disconnect(); window.removeEventListener('resize', schedule); window.removeEventListener('scroll', schedule) }
-  }, [shellRef, active, onReservedAreasChange])
+  }, [shellRef, active, dark, onReservedAreasChange])
 
   if (!layout) return null
   return <div className={`six-seven-effect${active ? ' is-active' : ''}${returning ? ' is-returning' : ''}`} aria-hidden="true">

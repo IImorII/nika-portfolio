@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#ffffff" />
+    <script>
+      try {
+        if (localStorage.getItem('veronica-theme') === 'dark') {
+          document.documentElement.dataset.theme = 'dark';
+          document.querySelector('meta[name="theme-color"]').content = '#000000';
+        }
+      } catch {}
+    </script>
     <meta name="description" content="Multidisciplinary Graphic Designer" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Veronica Cherepko" />
