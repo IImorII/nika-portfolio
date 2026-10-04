@@ -38,6 +38,7 @@ export interface Category {
   number: string
   title: string
   jarPath: string
+  mobileJar?: { path: string; width: number; height: number }
   jarLayers: { path: string; blendMode: 'normal' | 'multiply' | 'lighten' | 'luminosity' | 'color-burn'; placement?: 'interior' | 'foreground' }[]
   glassPolygon?: import('./jar-geometry').GlassPolygon
   jarSettings: JarSettings
@@ -48,6 +49,7 @@ export interface JarConfig {
   id: string
   categoryId: string
   image: string
+  mobileImage?: { image: string; width: number; height: number }
   layers: { image: string; blendMode: 'normal' | 'multiply' | 'lighten' | 'luminosity' | 'color-burn'; placement?: 'interior' | 'foreground' }[]
   glassPolygon?: import('./jar-geometry').GlassPolygon
   rotation: number
@@ -102,6 +104,7 @@ export const jars: JarConfig[] = categories.map((category, index) => {
   const settings = category.jarSettings
   return {
     id: `jar-${category.number}`, categoryId: category.id, image: assetUrl(category.jarPath),
+    mobileImage: category.mobileJar ? { image: assetUrl(category.mobileJar.path), width: category.mobileJar.width, height: category.mobileJar.height } : undefined,
     layers: category.jarLayers.map(layer => ({ image: assetUrl(layer.path), blendMode: layer.blendMode, placement: layer.placement })),
     glassPolygon: category.glassPolygon,
     rotation: settings.rotation ?? (index * 47 % 61) - 30, scale: settings.scale ?? 1,

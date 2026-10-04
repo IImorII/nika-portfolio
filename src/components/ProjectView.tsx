@@ -10,6 +10,7 @@ import { createWheelNavigation } from '../wheel-navigation'
 import ScrollableNavigation from './ScrollableNavigation'
 import ProgressiveImage from './ProgressiveImage'
 import ProgressiveVideo from './ProgressiveVideo'
+import SwipeTransition from './SwipeTransition'
 
 function ProjectCopyright({ copyright }: { copyright: PortfolioProject['copyright'] }) {
   if (!copyright?.text.trim()) return null
@@ -27,6 +28,7 @@ export default function ProjectView({ project: initialCategory, closing, instant
   const [position, setPosition] = useState<ViewerPosition>({ projectIndex: 0, sectionIndex: 0, selected: null })
   const { projectIndex, sectionIndex, selected } = position
   const [size, setSize] = useState({ width: 0, height: 0 })
+  const [swipeDirection, setSwipeDirection] = useState(0)
   const project = category.projects[projectIndex]
   const sections = project?.sections ?? []
   const section = sections[sectionIndex]
@@ -38,18 +40,30 @@ export default function ProjectView({ project: initialCategory, closing, instant
   const canNavigate = sectionCounts.reduce((total, count) => total + count, 0) > 1
   const canNavigateMedia = category.projects.reduce((total, item) => total + item.media.length, 0) > 1
   const closeViewer = useCallback(() => setPosition(current => ({ ...current, selected: null })), [])
-  const switchProject = (index: number) => setPosition({ projectIndex: index, sectionIndex: 0, selected: null })
+  const switchProject = (index: number) => {
+    setSwipeDirection(0)
+    setPosition({ projectIndex: index, sectionIndex: 0, selected: null })
+  }
   const switchCategory = (next: Category) => {
     if (next.id === category.id) return
     setCategory(next)
+    setSwipeDirection(0)
     setPosition({ projectIndex: 0, sectionIndex: 0, selected: null })
   }
   const changeSection = useCallback((direction: number) => {
-    if (!closing) setPosition(current => ({ ...advanceProjectSection(sectionCounts, current, direction), selected: null }))
+    if (closing) return
+    setSwipeDirection(direction)
+    setPosition(current => ({ ...advanceProjectSection(sectionCounts, current, direction), selected: null }))
   }, [sectionCounts, closing])
   const changeMedia = useCallback((direction: number) => {
-    if (!closing) setPosition(current => advanceFullscreenMedia(category.projects, current, direction))
+    if (closing) return
+    setSwipeDirection(direction)
+    setPosition(current => advanceFullscreenMedia(category.projects, current, direction))
   }, [category.projects, closing])
+  const selectSection = (index: number) => {
+    setSwipeDirection(Math.sign(index - sectionIndex))
+    setPosition(current => ({ ...current, sectionIndex: index }))
+  }
   const sectionSwipe = useSwipeNavigation(changeSection)
   const mediaSwipe = useSwipeNavigation(changeMedia)
   const layout = useWorkLayout(media, size.width, size.height)
@@ -131,7 +145,8 @@ export default function ProjectView({ project: initialCategory, closing, instant
       )}</ScrollableNavigation>}
       <div ref={stageRef} className={`work-stage${canNavigate ? ' has-sections' : ''}`} role="region" aria-roledescription="carousel" aria-label={project?.title ?? category.title}
         {...sectionSwipe}>
-        <div key={`${project?.id}/${section?.id}`} className="work-slide" role="group" aria-roledescription="slide" aria-label={`${sectionIndex + 1} / ${sections.length}`}>
+        <SwipeTransition slideKey={`${category.id}/${project?.id}/${section?.id}`} direction={swipeDirection} ready={!media?.length || layout.length === media.length}>
+        <div className="work-slide" role="group" aria-roledescription="slide" aria-label={`${sectionIndex + 1} / ${sections.length}`}>
           {media?.length ? media.map((item, index) => {
             const rect = layout[index]
             if (!rect) return null
@@ -141,7 +156,10 @@ export default function ProjectView({ project: initialCategory, closing, instant
               onClick={event => {
                 mediaTrigger.current = event.currentTarget
                 const selected = allMedia.findIndex(media => media.path === item.path)
-                if (selected >= 0) setPosition(current => ({ ...current, selected }))
+                if (selected >= 0) {
+                  setSwipeDirection(0)
+                  setPosition(current => ({ ...current, selected }))
+                }
               }}>
               {item.kind === 'video'
                 ? <ProgressiveVideo media={item} label={label} playing={!viewerOpen} />
@@ -149,6 +167,7 @@ export default function ProjectView({ project: initialCategory, closing, instant
             </button>
           }) : <p className="work-empty">Works coming soon.</p>}
         </div>
+        </SwipeTransition>
         {canNavigate && <>
           <button className="section-arrow section-arrow-prev" type="button" disabled={closing} onClick={() => changeSection(-1)} data-interactive="true" aria-label="Previous section"><span aria-hidden="true">←</span></button>
           <button className="section-arrow section-arrow-next" type="button" disabled={closing} onClick={() => changeSection(1)} data-interactive="true" aria-label="Next section"><span aria-hidden="true">→</span></button>
@@ -156,7 +175,7 @@ export default function ProjectView({ project: initialCategory, closing, instant
       </div>
       <footer className="section-controls">
         {sections.length > 1 && <>
-          <nav className="section-dots" aria-label="Sections">{sections.map((item, index) => <button key={item.id} type="button" className="section-dot" aria-label={`Section ${index + 1}`} aria-current={index === sectionIndex ? 'true' : undefined} onClick={() => setPosition(current => ({ ...current, sectionIndex: index }))} data-interactive="true"><span /></button>)}</nav>
+          <nav className="section-dots" aria-label="Sections">{sections.map((item, index) => <button key={item.id} type="button" className="section-dot" aria-label={`Section ${index + 1}`} aria-current={index === sectionIndex ? 'true' : undefined} onClick={() => selectSection(index)} data-interactive="true"><span /></button>)}</nav>
         </>}
         <ProjectCopyright copyright={project?.copyright} />
       </footer>
@@ -164,6 +183,7 @@ export default function ProjectView({ project: initialCategory, closing, instant
     {current && <div className="media-viewer" role="dialog" aria-modal="true" aria-label={project.title}>
       <header><span>{project.title}</span><button ref={viewerCloseRef} className="icon-button" type="button" onClick={closeViewer} data-interactive="true" aria-label="Close fullscreen">×</button></header>
       <div ref={viewerStageRef} className="media-viewer-stage" {...mediaSwipe}>
+        <SwipeTransition slideKey={current.path} direction={swipeDirection}>
         <div className="media-viewer-artwork" style={{ '--media-aspect': current.width / current.height } as CSSProperties}>
           {current.kind === 'video' ? <ProgressiveVideo key={current.path} media={current} label={project.title} /> : <ProgressiveImage key={current.path} media={current} label={project.title} priority="high" />}
           {canNavigateMedia && <>
@@ -171,6 +191,7 @@ export default function ProjectView({ project: initialCategory, closing, instant
             <button className="media-edge-button media-edge-next" type="button" disabled={closing} onClick={() => changeMedia(1)} data-interactive="true" aria-label="Next work" />
           </>}
         </div>
+        </SwipeTransition>
       </div>
       <footer><div className="media-viewer-navigation" aria-live="polite" aria-atomic="true"><span className="media-position">{selected! + 1} / {allMedia.length}</span><span className="media-position">Section {sectionIndex + 1} / {sections.length}</span></div><ProjectCopyright copyright={project.copyright} /></footer>
     </div>}

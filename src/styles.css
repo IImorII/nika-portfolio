@@ -145,7 +145,6 @@ button:focus-visible{outline:2px solid var(--foreground);outline-offset:5px}
 .project-view .project-shell{animation:project-reveal .7s cubic-bezier(.2,.7,.2,1)}
 .project-view.project-closing .project-shell{animation:project-conceal .6s cubic-bezier(.25,.72,.2,1) forwards}
 .project-view.project-instant .project-shell{animation:none;clip-path:none}
-.project-view.project-instant .work-slide{animation:none}
 @keyframes project-reveal{from{clip-path:circle(0% at 50% 50%)}to{clip-path:circle(80% at 50% 50%)}}@keyframes project-conceal{from{clip-path:circle(80% at 50% 50%)}to{clip-path:circle(0% at 50% 50%)}}
 .flight-berry{position:fixed;z-index:100;display:block;left:var(--fly-start-x);top:var(--fly-start-y);width:var(--fly-start-size);height:var(--fly-start-size);object-fit:contain;pointer-events:none;transform:translate(-50%,-50%);transition:left 1.45s cubic-bezier(.34,.56,.22,1),top 1.45s cubic-bezier(.34,.56,.22,1),width 1.45s cubic-bezier(.34,.56,.22,1),height 1.45s cubic-bezier(.34,.56,.22,1)}
 .flight-out,.flight-return-ready{left:50vw;top:50vh;width:var(--fly-end-size);height:var(--fly-end-size)}
@@ -239,7 +238,13 @@ button:focus-visible{outline:2px solid var(--foreground);outline-offset:5px}
 .project-tabs button:hover{color:var(--foreground)}
 .work-stage{--arrow-rail:0px;position:relative;flex:1;min-height:0;min-width:0;padding:0 var(--arrow-rail);touch-action:pan-y;overflow:hidden}
 .work-stage.has-sections{--arrow-rail:0px}
-.work-slide{position:absolute;inset:0 var(--arrow-rail);display:grid;animation:work-slide-in .24s ease-out both}
+.work-slide{position:absolute;inset:0 var(--arrow-rail);display:grid}
+.swipe-transition{position:absolute;inset:0;overflow:hidden}
+.swipe-frame{position:absolute;inset:0;display:grid;place-items:center;min-width:0;min-height:0}
+.swipe-incoming{animation:swipe-in 260ms cubic-bezier(.22,.61,.36,1) both;will-change:transform}
+.swipe-outgoing{animation:swipe-out 260ms cubic-bezier(.22,.61,.36,1) both;pointer-events:none;will-change:transform}
+@keyframes swipe-in{from{transform:translateX(calc(var(--swipe-direction) * 100%))}to{transform:translateX(0)}}
+@keyframes swipe-out{from{transform:translateX(0)}to{transform:translateX(calc(var(--swipe-direction) * -100%))}}
 .section-arrow{position:absolute;top:0;bottom:0;z-index:4;display:grid;place-items:center;isolation:isolate;width:clamp(44px,4vw,64px);height:100%;border:0;border-radius:0;background:transparent;color:var(--foreground);font-size:28px;line-height:1;font-weight:400;padding:0}
 .section-arrow::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border:1px solid #ffffff70;background:var(--glass-rail);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:inset 0 0 24px #ffffff1a,0 0 18px #15151308;opacity:0;transition:opacity .3s ease,background .3s ease,backdrop-filter .35s ease,-webkit-backdrop-filter .35s ease,box-shadow .3s ease}
 .section-arrow>span{display:grid;place-items:center;width:44px;height:44px;border:1px solid #ffffff90;border-radius:12px;background:var(--glass-background);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 2px 12px #15151312;transition:background .3s ease,border-color .3s ease,backdrop-filter .3s ease,-webkit-backdrop-filter .3s ease,box-shadow .3s ease}
@@ -250,7 +255,6 @@ button:focus-visible{outline:2px solid var(--foreground);outline-offset:5px}
 .section-arrow:focus-visible{outline-offset:-5px;outline-color:var(--foreground)}
 .media-viewer-stage .section-arrow{color:var(--foreground);font-size:28px;padding:0}
 .media-viewer-stage .section-arrow:focus-visible{outline-color:var(--page-background)}
-@keyframes work-slide-in{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
 .section-controls{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;flex:none;min-height:48px;padding-bottom:env(safe-area-inset-bottom,0px)}
 .section-dots{grid-column:2;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:0;min-width:0}
 .project-copyright{grid-column:3;justify-self:end;margin:8px 0;min-width:0;max-width:100%;font-weight:400;line-height:1.3;letter-spacing:normal;text-align:right;white-space:pre-wrap;overflow-wrap:anywhere}

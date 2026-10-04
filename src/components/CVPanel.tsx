@@ -31,7 +31,7 @@ export default function CVPanel({ open, onClose }: { open: boolean; onClose: () 
       <div className="panel-content">
         <div className="panel-heading">
           <h2>Veronica</h2>
-          <img className="panel-photo" src={`${import.meta.env.BASE_URL}cv/photo.png`} alt="Veronica Cherepko" width="770" height="770" />
+          <img className="panel-photo" src={open ? `${import.meta.env.BASE_URL}cv/photo-preview.webp` : undefined} alt="Veronica Cherepko" width="400" height="400" decoding="async" />
         </div>
         <section className="panel-about">
           <h3>About</h3>

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, existsSync, statSync, createReadStream, openSync, readSync, closeSync } from 'node:fs'
 import { pipeline } from 'node:stream'
 import path from 'node:path'
+import { createMobileJar } from './mobile-jars.mjs'
 import { readMediaDimensions, readImagePreview, readVideoPreview } from './media-dimensions.mjs'
 
 const moduleId = 'virtual:portfolio-assets'
@@ -270,19 +271,35 @@ export function servePortfolioAssets(root, base = '/') {
 export default function portfolioAssets() {
   let assetsRoot
   let base
+  let development = false
+  const mobileImages = new Map()
   return {
     name: 'portfolio-assets',
-    configResolved(config) { assetsRoot = path.join(config.publicDir, 'assets'); base = config.base },
+    configResolved(config) { assetsRoot = path.join(config.publicDir, 'assets'); base = config.base; development = config.command === 'serve' },
     resolveId(id) { if (id === moduleId) return resolvedId },
     async load(id) {
       if (id !== resolvedId) return
       const catalog = await scanPortfolioWithDimensions(assetsRoot, { previews: true })
+      for (const [index, category] of catalog.categories.entries()) {
+        const image = await createMobileJar(assetsRoot, category, index)
+        category.mobileJar = { path: image.fileName, width: image.width, height: image.height }
+        if (development) mobileImages.set(base + image.fileName, image.source)
+        else this.emitFile({ type: 'asset', fileName: image.fileName, source: image.source })
+      }
       for (const file of catalog.watched) this.addWatchFile(file)
       this.addWatchFile(path.dirname(assetsRoot))
       for (const warning of catalog.warnings) this.warn(warning)
       return `export default ${JSON.stringify(catalog.categories)}`
     },
     configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const image = mobileImages.get(req.url?.split('?')[0])
+        if (!image || !['GET', 'HEAD'].includes(req.method)) return next()
+        res.setHeader('Content-Type', 'image/webp')
+        res.setHeader('Content-Length', image.length)
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+        res.end(req.method === 'HEAD' ? undefined : image)
+      })
       server.middlewares.use(servePortfolioAssets(assetsRoot, base))
       server.watcher.add(assetsRoot)
       const refresh = (event, file) => {
