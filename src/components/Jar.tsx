@@ -9,7 +9,7 @@ import type { BerryWorld } from '../berry-physics'
 import { createParticleWorld, stepParticleWorld } from '../particle-physics'
 
 type Stroke = { x: number; y: number }
-type JarProps = { jar: JarConfig; project: Category; effect: 'shake' | 'shatter' | 'shattered' | 'reassemble' | null; onOpen: (project: Category, berry: DOMRect) => void; onEraser: (active: boolean) => void; onPairHover: (active: boolean) => void; onCategoryHover: (category: Category, active: boolean) => void }
+type JarProps = { jar: JarConfig; project: Category; paused: boolean; effect: 'shake' | 'shatter' | 'shattered' | 'reassemble' | null; onOpen: (project: Category, berry: DOMRect) => void; onEraser: (active: boolean) => void; onPairHover: (active: boolean) => void; onCategoryHover: (category: Category, active: boolean) => void }
 type Point = { x: number; y: number }
 
 // The cloth covers the neck, so only the visible glass body belongs to the light layer.
@@ -244,7 +244,7 @@ function MagicDust({ id, seed, contour, svgRef }: { id: string; seed: number; co
   })}</svg>
 }
 
-export default function Jar({ jar, project, effect, onOpen, onEraser, onPairHover, onCategoryHover }: JarProps) {
+export default function Jar({ jar, project, paused, effect, onOpen, onEraser, onPairHover, onCategoryHover }: JarProps) {
   const buttonRef = useRef<HTMLButtonElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const dustSvgRef = useRef<SVGSVGElement>(null)
@@ -277,7 +277,7 @@ export default function Jar({ jar, project, effect, onOpen, onEraser, onPairHove
   }, [jar, contour])
 
   useEffect(() => {
-    if (!berryWorld || effect) return
+    if (!berryWorld || effect || paused) return
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
     let frame = 0
     let previous = 0
@@ -305,7 +305,7 @@ export default function Jar({ jar, project, effect, onOpen, onEraser, onPairHove
       preference.removeEventListener('change', update)
       document.removeEventListener('visibilitychange', update)
     }
-  }, [berryWorld, effect])
+  }, [berryWorld, effect, paused])
 
   const beginRestore = () => {
     if (mode.current !== 'erasing') return
@@ -339,7 +339,7 @@ export default function Jar({ jar, project, effect, onOpen, onEraser, onPairHove
     if (!particleContour || !svgRef.current) return
     const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
     const updateMotion = () => {
-      if (motionPreference.matches) {
+      if (motionPreference.matches || paused) {
         svgRef.current?.pauseAnimations()
         dustSvgRef.current?.pauseAnimations()
       } else {
@@ -350,7 +350,7 @@ export default function Jar({ jar, project, effect, onOpen, onEraser, onPairHove
     updateMotion()
     motionPreference.addEventListener('change', updateMotion)
     return () => motionPreference.removeEventListener('change', updateMotion)
-  }, [particleContour, berryWorld])
+  }, [particleContour, berryWorld, paused])
 
   const addStroke = (event: PointerEvent<HTMLButtonElement>) => {
     if (mode.current !== 'erasing' || !svgRef.current || !particleContour) return
@@ -430,7 +430,7 @@ export default function Jar({ jar, project, effect, onOpen, onEraser, onPairHove
             </mask>
           </defs>
           <g clipPath={'url(#' + jar.id + '-body)'}>
-            <g className="jar-glow-content" mask={'url(#' + maskId + ')'}><GlowParticles id={jar.id} count={jar.particleCount} seed={jar.seed} size={jar.particleSize} color={jar.particleColor} contour={particleContour} paused={!!effect} /></g>
+            <g className="jar-glow-content" mask={'url(#' + maskId + ')'}><GlowParticles id={jar.id} count={jar.particleCount} seed={jar.seed} size={jar.particleSize} color={jar.particleColor} contour={particleContour} paused={paused || !!effect} /></g>
           </g>
         </svg>}
         {contour && <svg className="jar-berry-layer" viewBox={`0 0 ${contour.width} ${contour.height}`} aria-hidden="true">
@@ -443,7 +443,7 @@ export default function Jar({ jar, project, effect, onOpen, onEraser, onPairHove
         {effect && effect !== 'shake' && <JarFragments jar={jar} effect={effect} />}
         {effect && effect !== 'shake' && <JarBurst jar={jar} effect={effect} />}
       </span>
-      {contour && <MagicDust id={jar.id} seed={jar.seed} contour={contour} svgRef={dustSvgRef} />}
+      {contour && !paused && <MagicDust id={jar.id} seed={jar.seed} contour={contour} svgRef={dustSvgRef} />}
     </span>
     <span className={'jar-index-anchor' + (jar.indexAnchor ? ' jar-index-anchor-custom' : '')} style={jar.indexAnchor ? { left: `${jar.indexAnchor.x}%`, top: `${jar.indexAnchor.y}%` } : undefined} aria-hidden="true">{project.number}</span>
   </button>

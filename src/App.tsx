@@ -20,6 +20,7 @@ const FLIGHT_OUT = 1450
 const PROJECT_CLOSE = 600
 const FLIGHT_RETURN = 1150
 const JAR_REASSEMBLE = 1050
+const MOBILE_VIEW = '(max-width: 650px), (pointer: coarse), (max-height: 500px) and (max-width: 980px)'
 
 export default function App() {
   const [cvOpen, setCvOpen] = useState(false)
@@ -40,6 +41,8 @@ export default function App() {
   const [revealOrigin, setRevealOrigin] = useState({ x: '50%', y: '50%', radius: '150vmax' })
   const [numberPositions, setNumberPositions] = useState<{ number: string; x: number; y: number }[]>([])
   const [reducedMotion, setReducedMotion] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [mobileView, setMobileView] = useState(() => matchMedia(MOBILE_VIEW).matches)
+  const instantProjects = mobileView || reducedMotion
   const shellRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLButtonElement>(null)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -110,9 +113,35 @@ export default function App() {
     media.addEventListener('change', change)
     return () => media.removeEventListener('change', change)
   }, [])
+  useEffect(() => {
+    const media = matchMedia(MOBILE_VIEW)
+    const change = () => setMobileView(media.matches)
+    media.addEventListener('change', change)
+    return () => media.removeEventListener('change', change)
+  }, [])
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
   useEffect(() => () => { if (pairLeaveTimer.current) clearTimeout(pairLeaveTimer.current) }, [])
-  useEffect(() => { document.body.style.overflow = activeProject || cvOpen ? 'hidden' : ''; return () => { document.body.style.overflow = '' } }, [activeProject, cvOpen])
+  const modalOpen = Boolean(activeProject) || cvOpen
+  useLayoutEffect(() => {
+    if (!modalOpen) return
+    const body = document.body
+    const root = document.documentElement
+    const scrollX = window.scrollX
+    const scrollY = window.scrollY
+    const previous = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, overflow: body.style.overflow, rootOverflow: root.style.overflow }
+    // Fixed positioning also locks the background on mobile Safari, retaining
+    // the home page's scroll position when the full-screen view closes.
+    Object.assign(body.style, { position: 'fixed', top: `-${scrollY}px`, left: '0', right: '0', overflow: 'hidden' })
+    root.style.overflow = 'hidden'
+    return () => {
+      Object.assign(body.style, { position: previous.position, top: previous.top, left: previous.left, right: previous.right, overflow: previous.overflow })
+      root.style.overflow = previous.rootOverflow
+      const scrollBehavior = root.style.scrollBehavior
+      root.style.scrollBehavior = 'auto'
+      window.scrollTo(scrollX, scrollY)
+      root.style.scrollBehavior = scrollBehavior
+    }
+  }, [modalOpen])
 
   const later = (fn: () => void, delay: number) => { timers.current.push(setTimeout(fn, delay)) }
   const openProject = (project: Category, rect: DOMRect) => {
@@ -120,7 +149,7 @@ export default function App() {
     setHoveredCategory(null)
     setCvOpen(false)
     lastRect.current = rect
-    if (reducedMotion) { setActiveProject(project); return }
+    if (instantProjects) { setActiveProject(project); return }
     setJarEffect({ id: project.id, phase: 'shake' })
     later(() => setJarEffect({ id: project.id, phase: 'shatter' }), SHAKE_DURATION)
     later(() => {
@@ -133,7 +162,11 @@ export default function App() {
   }
   const closeProject = useCallback(() => {
     if (!activeProject || closingRef.current) return
-    if (reducedMotion || !lastRect.current) {
+    if (instantProjects || !lastRect.current) {
+      timers.current.forEach(clearTimeout)
+      timers.current = []
+      closingRef.current = false
+      setClosing(false)
       setActiveProject(null)
       setFlight(null)
       setJarEffect(null)
@@ -153,7 +186,7 @@ export default function App() {
       setJarEffect({ id: activeProject.id, phase: 'reassemble' })
     }, PROJECT_CLOSE + FLIGHT_RETURN + 50)
     later(() => { closingRef.current = false; setClosing(false); setJarEffect(null) }, PROJECT_CLOSE + FLIGHT_RETURN + 50 + JAR_REASSEMBLE)
-  }, [activeProject, reducedMotion])
+  }, [activeProject, instantProjects])
 
   const flightStyle = flight ? {
     '--fly-start-x': `${flight.rect.left + flight.rect.width / 2}px`,
@@ -163,23 +196,23 @@ export default function App() {
   } as CSSProperties : undefined
 
   return <>
-    <div ref={shellRef} inert={cvOpen || Boolean(activeProject)} className={`site-shell${inverted ? ' is-inverted' : ''}${pairActive || pairDigitsAway ? ' six-seven-active' : ''}`} style={{ '--stage-height': desktopStageHeight + 'px', '--mobile-stage-height': mobileStageHeight + 'px', '--reveal-x': revealOrigin.x, '--reveal-y': revealOrigin.y, '--reveal-radius': revealOrigin.radius } as CSSProperties}>
+    <div ref={shellRef} inert={cvOpen || Boolean(activeProject)} className={`site-shell${activeProject ? ' project-open' : ''}${mobileView ? ' mobile-static' : ''}${inverted ? ' is-inverted' : ''}${pairActive || pairDigitsAway ? ' six-seven-active' : ''}`} style={{ '--stage-height': desktopStageHeight + 'px', '--mobile-stage-height': mobileStageHeight + 'px', '--reveal-x': revealOrigin.x, '--reveal-y': revealOrigin.y, '--reveal-radius': revealOrigin.radius } as CSSProperties}>
       <div className="color-reveal" aria-hidden="true" />
       <div className="jar-indices" aria-hidden="true">{numberPositions.map(({ number, x, y }) => <span className="jar-index" key={number} data-jar-number={number} style={{ left: x, top: y }}><span>{number.slice(0, -1)}</span><span className="jar-index-last"><i className="jar-index-baseline" />{number.slice(-1)}</span></span>)}</div>
       <header className="site-header"><button type="button" onClick={() => setCvOpen(true)} data-interactive="true">ABOUT <span aria-hidden="true">↗</span></button></header>
       <section className="home" aria-label="Selected portfolio projects">
         <div className="home-stage">
           <VeronicaTitle titleRef={titleRef} onReveal={startReveal} onConceal={() => setInverted(false)} onOpen={() => setCvOpen(true)} />
-          <div className="jar-scene">{jars.map(jar => <Jar key={jar.id} jar={jar} project={categories.find(category => category.id === jar.categoryId)!} effect={jarEffect?.id === jar.categoryId ? jarEffect.phase : null} onOpen={openProject} onEraser={onEraser} onPairHover={onPairHover} onCategoryHover={onCategoryHover} />)}</div>
+          <div className="jar-scene">{jars.map(jar => <Jar key={jar.id} jar={jar} project={categories.find(category => category.id === jar.categoryId)!} paused={mobileView || modalOpen} effect={jarEffect?.id === jar.categoryId ? jarEffect.phase : null} onOpen={openProject} onEraser={onEraser} onPairHover={onPairHover} onCategoryHover={onCategoryHover} />)}</div>
           {categories.length === 0 && <p className="archive-empty">The archive is being prepared.</p>}
         </div>
       </section>
       {hoveredCategory && !cvOpen && !activeProject && !flight && !jarEffect && <CategoryLabel key={hoveredCategory.id} category={hoveredCategory} shellRef={shellRef} reservedAreas={sixSevenReservedAreas} />}
       <footer className="site-footer"><span>© Veronica Cherepko / 2026</span></footer>
     </div>
-    <SixSevenEffect active={pairActive} returning={pairDigitsAway && !pairActive} shellRef={shellRef} onReservedAreasChange={setSixSevenReservedAreas} />
+    {!activeProject && <SixSevenEffect active={pairActive} returning={pairDigitsAway && !pairActive} shellRef={shellRef} onReservedAreasChange={setSixSevenReservedAreas} />}
     <CVPanel open={cvOpen} onClose={() => setCvOpen(false)} />
-    {activeProject && <ProjectView project={activeProject} closing={closing} onClose={closeProject} />}
+    {activeProject && <ProjectView project={activeProject} closing={closing} instant={instantProjects} onClose={closeProject} />}
     {flight && <img src={blueberryUrl} alt="" draggable="false" className={`flight-berry flight-${flight.phase}`} style={flightStyle} aria-hidden="true" />}
     <CustomCursor erasing={erasing} />
   </>

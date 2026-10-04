@@ -5,7 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import sharp from 'sharp'
-import { readMediaDimensions } from './media-dimensions.mjs'
+import { readMediaDimensions, readImagePreview } from './media-dimensions.mjs'
 import { scanPortfolioWithDimensions } from './portfolio-assets.mjs'
 
 function fixture(t) {
@@ -22,13 +22,23 @@ test('reads every supported image format and browser EXIF orientation', async t 
     const file = path.join(root, `image.${format}`)
     await image(37, 19).toFormat(format).toFile(file)
     assert.deepEqual(await readMediaDimensions(file, 'image'), { width: 37, height: 19 }, format)
+    const preview = Buffer.from((await readImagePreview(file)).split(',')[1], 'base64')
+    const metadata = await sharp(preview).metadata()
+    assert.equal(metadata.format, 'webp')
+    assert.ok(metadata.width <= 32 && metadata.height <= 32, format)
+    assert.ok(preview.length < 2048, format)
   }
   const svg = path.join(root, 'image.svg')
   writeFileSync(svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 120"></svg>')
   assert.deepEqual(await readMediaDimensions(svg, 'image'), { width: 80, height: 120 })
+  const svgPreview = await sharp(Buffer.from((await readImagePreview(svg)).split(',')[1], 'base64')).metadata()
+  assert.equal(svgPreview.height, 32)
+  assert.ok(svgPreview.hasAlpha)
   const rotated = path.join(root, 'rotated.jpg')
   await image(37, 19).withMetadata({ orientation: 6 }).jpeg().toFile(rotated)
   assert.deepEqual(await readMediaDimensions(rotated, 'image'), { width: 19, height: 37 })
+  const rotatedPreview = await sharp(Buffer.from((await readImagePreview(rotated)).split(',')[1], 'base64')).metadata()
+  assert.ok(rotatedPreview.width < rotatedPreview.height)
 })
 
 test('animated images reserve the dimensions of a single frame', async t => {
@@ -38,6 +48,8 @@ test('animated images reserve the dimensions of a single frame', async t => {
   await sharp(frames, { raw: { width: 7, height: 22, channels: 4, pageHeight: 11 } }).gif().toFile(file)
   assert.equal((await sharp(file).metadata()).pages, 2)
   assert.deepEqual(await readMediaDimensions(file, 'image'), { width: 7, height: 11 })
+  const preview = await sharp(Buffer.from((await readImagePreview(file)).split(',')[1], 'base64')).metadata()
+  assert.deepEqual([preview.width, preview.height], [7, 11])
 })
 
 function box(type, payload, extended = false) {
@@ -91,23 +103,30 @@ test('build catalog contains dimensions for sections and fullscreen; replacement
   writeFileSync(path.join(root, 'digital/jar.webp'), 'fixture')
   const file = path.join(project, 'section_1/50% #1.png')
   await image(80, 120).png().toFile(file)
-  let catalog = await scanPortfolioWithDimensions(root)
+  let catalog = await scanPortfolioWithDimensions(root, { previews: true })
   const media = catalog.categories[0].projects[0].media[0]
   assert.deepEqual([media.width, media.height], [80, 120])
   assert.strictEqual(catalog.categories[0].projects[0].sections[0].media[0], media)
   assert.ok(catalog.watched.includes(file))
+  assert.ok(media.preview.startsWith('data:image/webp;base64,'))
   await image(160, 90).png().toFile(file)
-  catalog = await scanPortfolioWithDimensions(root)
+  catalog = await scanPortfolioWithDimensions(root, { previews: true })
   assert.deepEqual(catalog.categories[0].projects[0].media.map(item => [item.width, item.height]), [[160, 90]])
+  assert.notEqual(catalog.categories[0].projects[0].media[0].preview, media.preview)
 })
 
 test('every shipped image and video has dimensions before any browser request', async () => {
-  const catalog = await scanPortfolioWithDimensions(fileURLToPath(new URL('../public/assets/', import.meta.url)))
+  const catalog = await scanPortfolioWithDimensions(fileURLToPath(new URL('../public/assets/', import.meta.url)), { previews: true })
   const media = catalog.categories.flatMap(category => category.projects.flatMap(project => project.media))
   assert.ok(media.length > 100)
   assert.ok(media.some(item => item.kind === 'video'))
   for (const item of media) {
     assert.ok(item.width > 0 && item.height > 0, item.path)
     assert.ok(Number.isFinite(item.width / item.height), item.path)
+    if (item.kind === 'image') {
+      assert.ok(item.preview.startsWith('data:image/webp;base64,'), item.path)
+      const preview = await sharp(Buffer.from(item.preview.split(',')[1], 'base64')).metadata()
+      assert.ok(preview.width <= 32 && preview.height <= 32, item.path)
+    } else assert.equal(item.preview, undefined)
   }
 })

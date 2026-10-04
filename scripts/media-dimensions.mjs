@@ -71,3 +71,17 @@ export async function readMediaDimensions(file, kind) {
     throw new Error(`${file}: cannot read media dimensions: ${error.message}`, { cause: error })
   }
 }
+
+export async function readImagePreview(file) {
+  try {
+    // Inline a tiny first frame so opening a section needs no preview requests.
+    const preview = await sharp(file)
+      .autoOrient()
+      .resize({ width: 32, height: 32, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 30, effort: 3 })
+      .toBuffer()
+    return `data:image/webp;base64,${preview.toString('base64')}`
+  } catch (error) {
+    throw new Error(`${file}: cannot create image preview: ${error.message}`, { cause: error })
+  }
+}

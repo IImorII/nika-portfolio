@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync, statSync, createReadStream, openSync, readSync, closeSync } from 'node:fs'
 import { pipeline } from 'node:stream'
 import path from 'node:path'
-import { readMediaDimensions } from './media-dimensions.mjs'
+import { readMediaDimensions, readImagePreview } from './media-dimensions.mjs'
 
 const moduleId = 'virtual:portfolio-assets'
 const resolvedId = '\0' + moduleId
@@ -214,7 +214,7 @@ export function scanPortfolio(root) {
   return { categories, watched: [...watched], warnings }
 }
 
-export async function scanPortfolioWithDimensions(root) {
+export async function scanPortfolioWithDimensions(root, { previews = false } = {}) {
   const catalog = scanPortfolio(root)
   // Section and fullscreen lists share these objects, so enrich each only once.
   const media = catalog.categories.flatMap(category => category.projects.flatMap(project => project.media))
@@ -225,6 +225,7 @@ export async function scanPortfolioWithDimensions(root) {
       const item = media[next++]
       const file = path.join(root, ...item.path.split('/').slice(1).map(decodeURIComponent))
       Object.assign(item, await readMediaDimensions(file, item.kind))
+      if (previews && item.kind === 'image') item.preview = await readImagePreview(file)
     }
   }))
   return catalog
@@ -275,7 +276,7 @@ export default function portfolioAssets() {
     resolveId(id) { if (id === moduleId) return resolvedId },
     async load(id) {
       if (id !== resolvedId) return
-      const catalog = await scanPortfolioWithDimensions(assetsRoot)
+      const catalog = await scanPortfolioWithDimensions(assetsRoot, { previews: true })
       for (const file of catalog.watched) this.addWatchFile(file)
       this.addWatchFile(path.dirname(assetsRoot))
       for (const warning of catalog.warnings) this.warn(warning)

@@ -6,6 +6,7 @@ export interface PortfolioMedia {
   kind: 'image' | 'video'
   width: number
   height: number
+  preview?: string
   priority?: number
 }
 

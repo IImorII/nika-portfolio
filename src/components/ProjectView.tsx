@@ -4,6 +4,7 @@ import { assetUrl, categories } from '../data'
 import { packWorks } from '../work-layout'
 import useSwipeNavigation from '../useSwipeNavigation'
 import ScrollableNavigation from './ScrollableNavigation'
+import ProgressiveImage from './ProgressiveImage'
 
 function ProjectCopyright({ copyright }: { copyright: PortfolioProject['copyright'] }) {
   if (!copyright?.text.trim()) return null
@@ -25,7 +26,7 @@ function AnimatedVideo({ src, label, playing = true }: { src: string; label: str
     }} />
 }
 
-export default function ProjectView({ project: initialCategory, closing, onClose }: { project: Category; closing: boolean; onClose: () => void }) {
+export default function ProjectView({ project: initialCategory, closing, instant, onClose }: { project: Category; closing: boolean; instant: boolean; onClose: () => void }) {
   const [category, setCategory] = useState(initialCategory)
   const categoryTitleRef = useRef<HTMLHeadingElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -105,7 +106,7 @@ export default function ProjectView({ project: initialCategory, closing, onClose
     return () => window.removeEventListener('keydown', key)
   }, [onClose, viewerOpen, changeMedia, changeSection])
 
-  return <main ref={rootRef} role="dialog" aria-modal="true" aria-labelledby="category-title" className={`project-view ${closing ? 'project-closing' : ''}`}>
+  return <main ref={rootRef} role="dialog" aria-modal="true" aria-labelledby="category-title" className={`project-view${closing ? ' project-closing' : ''}${instant ? ' project-instant' : ''}`}>
     <div className="project-shell" inert={viewerOpen}>
       <header className="project-header">
         <div className="category-navigation">
@@ -142,7 +143,7 @@ export default function ProjectView({ project: initialCategory, closing, onClose
               }}>
               {item.kind === 'video'
                 ? <AnimatedVideo src={assetUrl(item.path)} label={label} playing={!viewerOpen} />
-                : <img src={assetUrl(item.path)} alt={label} width={item.width} height={item.height} decoding="async" />}
+                : <ProgressiveImage media={item} label={label} />}
             </button>
           }) : <p className="work-empty">Works coming soon.</p>}
         </div>
@@ -162,7 +163,7 @@ export default function ProjectView({ project: initialCategory, closing, onClose
     </div>
     {current && <div className="media-viewer" role="dialog" aria-modal="true" aria-label={project.title}>
       <header><span>{project.title}</span><button ref={viewerCloseRef} className="icon-button" type="button" onClick={() => setSelected(null)} data-interactive="true" aria-label="Close fullscreen">×</button></header>
-      <div className="media-viewer-stage" {...mediaSwipe}>{current.kind === 'video' ? <AnimatedVideo key={current.path} src={assetUrl(current.path)} label={project.title} /> : <img src={assetUrl(current.path)} alt={project.title} width={current.width} height={current.height} decoding="async" draggable="false" />}</div>
+      <div className="media-viewer-stage" {...mediaSwipe}>{current.kind === 'video' ? <AnimatedVideo key={current.path} src={assetUrl(current.path)} label={project.title} /> : <ProgressiveImage key={current.path} media={current} label={project.title} />}</div>
       <footer><nav className="media-viewer-navigation" aria-label="Works">{allMedia.length > 1 && <><button className="icon-button" type="button" onClick={() => changeMedia(-1)} data-interactive="true" aria-label="Previous work">←</button><span className="media-position" aria-live="polite" aria-atomic="true">{selected! + 1} / {allMedia.length}</span><button className="icon-button" type="button" onClick={() => changeMedia(1)} data-interactive="true" aria-label="Next work">→</button></>}</nav><ProjectCopyright copyright={project.copyright} /></footer>
     </div>}
   </main>
