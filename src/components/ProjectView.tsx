@@ -3,8 +3,8 @@ import type { CSSProperties } from 'react'
 import type { Category, PortfolioProject } from '../data'
 import { categories } from '../data'
 import useWorkLayout from '../useWorkLayout'
-import { advanceProjectSection, advanceFullscreenMedia } from '../project-navigation'
-import type { ViewerPosition } from '../project-navigation'
+import { advanceCategorySection, advanceCategoryMedia } from '../project-navigation'
+import type { CategoryViewerPosition } from '../project-navigation'
 import useSwipeNavigation from '../useSwipeNavigation'
 import { createWheelNavigation } from '../wheel-navigation'
 import ScrollableNavigation from './ScrollableNavigation'
@@ -18,15 +18,15 @@ function ProjectCopyright({ copyright }: { copyright: PortfolioProject['copyrigh
 }
 
 export default function ProjectView({ project: initialCategory, closing, instant, mobileView, onClose }: { project: Category; closing: boolean; instant: boolean; mobileView: boolean; onClose: () => void }) {
-  const [category, setCategory] = useState(initialCategory)
   const closeRef = useRef<HTMLButtonElement>(null)
   const viewerCloseRef = useRef<HTMLButtonElement>(null)
   const rootRef = useRef<HTMLElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const viewerStageRef = useRef<HTMLDivElement>(null)
   const mediaTrigger = useRef<HTMLButtonElement | null>(null)
-  const [position, setPosition] = useState<ViewerPosition>({ projectIndex: 0, sectionIndex: 0, selected: null })
+  const [position, setPosition] = useState<CategoryViewerPosition>({ categoryIndex: Math.max(0, categories.findIndex(item => item.id === initialCategory.id)), projectIndex: 0, sectionIndex: 0, selected: null })
   const { projectIndex, sectionIndex, selected } = position
+  const category = categories[position.categoryIndex] ?? initialCategory
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [swipeDirection, setSwipeDirection] = useState(0)
   const project = category.projects[projectIndex]
@@ -36,30 +36,29 @@ export default function ProjectView({ project: initialCategory, closing, instant
   const allMedia = project?.media ?? []
   const current = selected === null ? null : allMedia[selected]
   const viewerOpen = selected !== null
-  const sectionCounts = useMemo(() => category.projects.map(item => item.sections.length), [category.projects])
-  const canNavigate = sectionCounts.reduce((total, count) => total + count, 0) > 1
-  const canNavigateMedia = category.projects.reduce((total, item) => total + item.media.length, 0) > 1
+  const sectionCounts = useMemo(() => categories.map(item => item.projects.map(project => project.sections.length)), [])
+  const canNavigate = sectionCounts.flat().reduce((total, count) => total + count, 0) > 1
+  const canNavigateMedia = categories.reduce((total, item) => total + item.projects.reduce((count, project) => count + project.media.length, 0), 0) > 1
   const closeViewer = useCallback(() => setPosition(current => ({ ...current, selected: null })), [])
   const switchProject = (index: number) => {
     setSwipeDirection(0)
-    setPosition({ projectIndex: index, sectionIndex: 0, selected: null })
+    setPosition(current => ({ ...current, projectIndex: index, sectionIndex: 0, selected: null }))
   }
   const switchCategory = (next: Category) => {
     if (next.id === category.id) return
-    setCategory(next)
     setSwipeDirection(0)
-    setPosition({ projectIndex: 0, sectionIndex: 0, selected: null })
+    setPosition({ categoryIndex: categories.findIndex(item => item.id === next.id), projectIndex: 0, sectionIndex: 0, selected: null })
   }
   const changeSection = useCallback((direction: number) => {
     if (closing) return
     setSwipeDirection(direction)
-    setPosition(current => ({ ...advanceProjectSection(sectionCounts, current, direction), selected: null }))
+    setPosition(current => ({ ...advanceCategorySection(sectionCounts, current, direction), selected: null }))
   }, [sectionCounts, closing])
   const changeMedia = useCallback((direction: number) => {
     if (closing) return
     setSwipeDirection(direction)
-    setPosition(current => advanceFullscreenMedia(category.projects, current, direction))
-  }, [category.projects, closing])
+    setPosition(current => advanceCategoryMedia(categories, current, direction))
+  }, [closing])
   const selectSection = (index: number) => {
     setSwipeDirection(Math.sign(index - sectionIndex))
     setPosition(current => ({ ...current, sectionIndex: index }))
@@ -125,7 +124,7 @@ export default function ProjectView({ project: initialCategory, closing, instant
       <header className="project-header">
         <div className="category-navigation">
           <h1 id="category-title" className="category-title">{category.title}</h1>
-          <ScrollableNavigation className="category-links" label="Categories" activeKey={category.id} revealActive={false}>
+          <ScrollableNavigation className="category-links" label="Categories" activeKey={category.id} revealActive={mobileView} activeAlign="center">
             {categories.map(item =>
               <button key={item.id} type="button" aria-current={item.id === category.id ? 'true' : undefined} disabled={closing} data-label={item.title} data-interactive="true" onClick={() => switchCategory(item)}><span>{item.title}</span></button>
             )}

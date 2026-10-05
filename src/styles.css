@@ -317,7 +317,7 @@ button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
   .navigation-group[data-overflow=false] .navigation-scroll{grid-template-columns:minmax(0,1fr)}
   .navigation-group[data-overflow=false] .navigation-scroll-button{display:none}
   .category-links{gap:8px;padding:2px;scrollbar-width:none;scroll-snap-type:x proximity;overscroll-behavior-x:contain;touch-action:pan-x pan-y pinch-zoom}
-  .category-links button{min-height:48px;padding:12px 16px;border:1px solid var(--control-border);border-radius:24px;font-size:18px;color:var(--muted);scroll-snap-align:start}
+  .category-links button{min-height:48px;padding:12px 16px;border:1px solid var(--control-border);border-radius:24px;font-size:18px;color:var(--muted);scroll-snap-align:center}
   .category-links button[aria-current=true]{background:var(--foreground);color:var(--page-background);border-color:var(--foreground)}
   .project-view .icon-button{min-width:48px;min-height:48px;font-size:30px;border:1px solid var(--control-border);border-radius:50%}
   .project-tabs{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;margin:0;gap:8px;padding:2px;scrollbar-width:none;overscroll-behavior-x:contain;scroll-snap-type:x proximity;touch-action:pan-x pan-y pinch-zoom}

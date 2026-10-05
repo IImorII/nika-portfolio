@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
-export default function ScrollableNavigation({ label, className, activeKey, revealActive = true, children }: {
-  label: string; className: string; activeKey: string; revealActive?: boolean; children: ReactNode
+export default function ScrollableNavigation({ label, className, activeKey, revealActive = true, activeAlign = 'nearest', children }: {
+  label: string; className: string; activeKey: string; revealActive?: boolean; activeAlign?: 'nearest' | 'center'; children: ReactNode
 }) {
   const navRef = useRef<HTMLElement>(null)
   const [edges, setEdges] = useState({ overflow: false, start: true, end: true })
@@ -24,9 +24,27 @@ export default function ScrollableNavigation({ label, className, activeKey, reve
     return () => observer.disconnect()
   }, [children])
   useLayoutEffect(() => {
-    if (revealActive) navRef.current?.querySelector<HTMLElement>('[aria-current="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    measure()
-  }, [activeKey, revealActive])
+    const nav = navRef.current
+    const active = nav?.querySelector<HTMLElement>('[aria-current="true"]')
+    if (!nav || !active || !revealActive) { measure(); return }
+    const reveal = () => {
+      if (activeAlign === 'center') {
+        const navRect = nav.getBoundingClientRect()
+        const activeRect = active.getBoundingClientRect()
+        const left = nav.scrollLeft + activeRect.left + activeRect.width / 2 - (navRect.left + nav.clientLeft + nav.clientWidth / 2)
+        nav.scrollTo({ left: Math.max(0, Math.min(nav.scrollWidth - nav.clientWidth, left)), behavior: 'auto' })
+      } else active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      measure()
+    }
+    reveal()
+    if (activeAlign !== 'center') return
+    // Keep the selection visible after rotation or font loading, without
+    // resetting a user's manual scroll on unrelated React renders.
+    const observer = new ResizeObserver(reveal)
+    observer.observe(nav)
+    observer.observe(active)
+    return () => observer.disconnect()
+  }, [activeKey, revealActive, activeAlign])
   const scroll = (direction: number) => {
     const nav = navRef.current
     if (!nav) return
