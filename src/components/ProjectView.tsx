@@ -132,7 +132,7 @@ export default function ProjectView({ project: initialCategory, closing, instant
         </div>
         <button ref={closeRef} className="icon-button" type="button" onClick={onClose} data-interactive="true" aria-label="Close portfolio">×</button>
       </header>
-      {category.projects.length > 0 && <ScrollableNavigation className="project-tabs" label="Projects" activeKey={project?.id ?? ''}>{category.projects.map((item, index) =>
+      {category.projects.length > 0 && <ScrollableNavigation className="project-tabs" label="Projects" activeKey={`${category.id}/${project?.id ?? ''}`} activeAlign={mobileView ? 'center' : 'nearest'}>{category.projects.map((item, index) =>
         <button key={item.id} type="button" aria-current={index === projectIndex ? 'true' : undefined} data-interactive="true" onClick={() => switchProject(index)}
           onKeyDown={event => {
             if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return

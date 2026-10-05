@@ -312,7 +312,7 @@ button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
   .category-links-group{grid-column:1/-1;grid-row:2;width:100%}
   .project-tabs-group{border-top:1px solid var(--border);padding-top:12px;padding-bottom:12px}
   .navigation-scroll{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:6px;min-width:0;align-items:center}
-  .navigation-scroll-button{display:grid;place-items:center;width:48px;height:48px;flex:none;border:1px solid var(--control-border);border-radius:50%;padding:0!important;background:transparent;font-family:Helvetica,sans-serif!important;font-size:30px!important;line-height:1;letter-spacing:0!important;color:var(--foreground)}
+  .navigation-scroll-button{display:grid;place-items:center;width:48px;height:48px;flex:none;border:0;border-radius:0;padding:0!important;background:transparent;font-family:Helvetica,sans-serif!important;font-size:30px!important;line-height:1;letter-spacing:0!important;color:var(--foreground)}
   .navigation-scroll-button:disabled{opacity:.25}
   .navigation-group[data-overflow=false] .navigation-scroll{grid-template-columns:minmax(0,1fr)}
   .navigation-group[data-overflow=false] .navigation-scroll-button{display:none}
@@ -321,7 +321,7 @@ button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
   .category-links button[aria-current=true]{background:var(--foreground);color:var(--page-background);border-color:var(--foreground)}
   .project-view .icon-button{min-width:48px;min-height:48px;font-size:30px;border:1px solid var(--control-border);border-radius:50%}
   .project-tabs{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;margin:0;gap:8px;padding:2px;scrollbar-width:none;overscroll-behavior-x:contain;scroll-snap-type:x proximity;touch-action:pan-x pan-y pinch-zoom}
-  .project-tabs button{flex:none;min-height:48px;padding:12px 16px;font-size:16px;max-width:100%;white-space:normal;border:1px solid var(--control-border);border-radius:12px;scroll-snap-align:start}
+  .project-tabs button{flex:none;min-height:48px;padding:12px 16px;font-size:16px;max-width:100%;white-space:normal;border:1px solid var(--control-border);border-radius:12px;scroll-snap-align:center}
   .project-tabs button[aria-current=true]{background:var(--foreground);color:var(--page-background);border-color:var(--foreground)}
   .project-tabs button[aria-current=true] span{box-shadow:none}
   .work-stage>.section-arrow,.media-viewer-stage>.section-arrow{display:none}
