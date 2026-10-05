@@ -7,6 +7,7 @@ export interface PortfolioMedia {
   width: number
   height: number
   preview?: string
+  mobilePath?: string
   priority?: number
 }
 

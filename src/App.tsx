@@ -225,7 +225,7 @@ export default function App() {
     </div>
     {!activeProject && <SixSevenEffect active={pairActive} returning={pairDigitsAway && !pairActive} dark={darkTheme !== inverted} shellRef={shellRef} onReservedAreasChange={setSixSevenReservedAreas} />}
     <CVPanel open={cvOpen} onClose={() => setCvOpen(false)} />
-    {activeProject && <ProjectView project={activeProject} closing={closing} instant={instantProjects} onClose={closeProject} />}
+    {activeProject && <ProjectView project={activeProject} closing={closing} instant={instantProjects} mobileView={mobileView} onClose={closeProject} />}
     {flight && <img src={blueberryUrl} alt="" draggable="false" className={`flight-berry flight-${flight.phase}`} style={flightStyle} aria-hidden="true" />}
     <CustomCursor erasing={erasing} />
   </>

@@ -2,17 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import { assetUrl } from '../data'
 import type { PortfolioMedia } from '../data'
 
-export default function ProgressiveVideo({ media, label, playing = true }: { media: PortfolioMedia; label: string; playing?: boolean }) {
+export default function ProgressiveVideo({ media, label, playing = true, mobilePreview = false }: { media: PortfolioMedia; label: string; playing?: boolean; mobilePreview?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [decodedSrc, setDecodedSrc] = useState<string | null>(null)
-  const src = assetUrl(media.path)
+  const src = mobilePreview ? (media.mobilePath ? assetUrl(media.mobilePath) : undefined) : assetUrl(media.path)
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
     // Metadata alone does not provide a drawable frame. Keep the preview until
     // HAVE_CURRENT_DATA, including when playback is paused or autoplay is blocked.
-    const reveal = () => { if (video.readyState >= 2) setDecodedSrc(src) }
+    const reveal = () => { if (src && video.readyState >= 2) setDecodedSrc(src) }
     const reset = () => setDecodedSrc(null)
     video.addEventListener('loadeddata', reveal)
     video.addEventListener('playing', reveal)
@@ -30,7 +30,7 @@ export default function ProgressiveVideo({ media, label, playing = true }: { med
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-    if (playing) {
+    if (playing && src) {
       video.src = src
       void video.play().catch(() => {})
     } else {

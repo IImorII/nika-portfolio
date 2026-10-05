@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { assetUrl } from '../data'
 import type { PortfolioMedia } from '../data'
 
-export default function ProgressiveImage({ media, label, priority = 'low', active = true }: { media: PortfolioMedia; label: string; priority?: 'low' | 'high'; active?: boolean }) {
+export default function ProgressiveImage({ media, label, priority = 'low', active = true, mobilePreview = false }: { media: PortfolioMedia; label: string; priority?: 'low' | 'high'; active?: boolean; mobilePreview?: boolean }) {
   const imageRef = useRef<HTMLImageElement>(null)
   const [decodedSrc, setDecodedSrc] = useState<string | null>(null)
-  const src = assetUrl(media.path)
+  const src = mobilePreview ? (media.mobilePath ? assetUrl(media.mobilePath) : undefined) : assetUrl(media.path)
   const ready = active && decodedSrc === src
 
   useEffect(() => {
     const image = imageRef.current
-    if (!image || !active) return
+    if (!image || !active || !src) return
     if (image.getAttribute('src') !== src) image.src = src
     let cancelled = false
     const reveal = async () => {

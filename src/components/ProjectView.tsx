@@ -17,7 +17,7 @@ function ProjectCopyright({ copyright }: { copyright: PortfolioProject['copyrigh
   return <p className="project-copyright" style={{ fontFamily: copyright.font ?? 'Helvetica, Arial, sans-serif', fontSize: copyright.size ?? 12, color: copyright.color ?? '#75736e' }}>{copyright.text}</p>
 }
 
-export default function ProjectView({ project: initialCategory, closing, instant, onClose }: { project: Category; closing: boolean; instant: boolean; onClose: () => void }) {
+export default function ProjectView({ project: initialCategory, closing, instant, mobileView, onClose }: { project: Category; closing: boolean; instant: boolean; mobileView: boolean; onClose: () => void }) {
   const [category, setCategory] = useState(initialCategory)
   const closeRef = useRef<HTMLButtonElement>(null)
   const viewerCloseRef = useRef<HTMLButtonElement>(null)
@@ -162,8 +162,8 @@ export default function ProjectView({ project: initialCategory, closing, instant
                 }
               }}>
               {item.kind === 'video'
-                ? <ProgressiveVideo media={item} label={label} playing={!viewerOpen} />
-                : <ProgressiveImage media={item} label={label} active={!viewerOpen} />}
+                ? <ProgressiveVideo media={item} label={label} playing={!viewerOpen} mobilePreview={mobileView} />
+                : <ProgressiveImage media={item} label={label} active={!viewerOpen} mobilePreview={mobileView} />}
             </button>
           }) : <p className="work-empty">Works coming soon.</p>}
         </div>

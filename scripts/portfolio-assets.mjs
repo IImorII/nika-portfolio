@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, existsSync, statSync, createReadStream, open
 import { pipeline } from 'node:stream'
 import path from 'node:path'
 import { createMobileJar } from './mobile-jars.mjs'
+import { createMobileMedia } from './mobile-media.mjs'
 import { readMediaDimensions, readImagePreview, readVideoPreview } from './media-dimensions.mjs'
 
 const moduleId = 'virtual:portfolio-assets'
@@ -215,7 +216,7 @@ export function scanPortfolio(root) {
   return { categories, watched: [...watched], warnings }
 }
 
-export async function scanPortfolioWithDimensions(root, { previews = false } = {}) {
+export async function scanPortfolioWithDimensions(root, { previews = false, onMobileMedia } = {}) {
   const catalog = scanPortfolio(root)
   // Section and fullscreen lists share these objects, so enrich each only once.
   const media = catalog.categories.flatMap(category => category.projects.flatMap(project => project.media))
@@ -227,6 +228,11 @@ export async function scanPortfolioWithDimensions(root, { previews = false } = {
       const file = path.join(root, ...item.path.split('/').slice(1).map(decodeURIComponent))
       Object.assign(item, await readMediaDimensions(file, item.kind))
       if (previews) item.preview = await (item.kind === 'video' ? readVideoPreview(file) : readImagePreview(file))
+      if (onMobileMedia) {
+        const mobile = await createMobileMedia(file, item.kind)
+        item.mobilePath = mobile.fileName
+        await onMobileMedia(mobile)
+      }
     }
   }))
   return catalog
@@ -279,7 +285,10 @@ export default function portfolioAssets() {
     resolveId(id) { if (id === moduleId) return resolvedId },
     async load(id) {
       if (id !== resolvedId) return
-      const catalog = await scanPortfolioWithDimensions(assetsRoot, { previews: true })
+      const catalog = await scanPortfolioWithDimensions(assetsRoot, { previews: true, onMobileMedia: mobile => {
+        if (development) mobileImages.set(base + mobile.fileName, mobile.source)
+        else this.emitFile({ type: 'asset', fileName: mobile.fileName, source: mobile.source })
+      } })
       for (const [index, category] of catalog.categories.entries()) {
         const image = await createMobileJar(assetsRoot, category, index)
         category.mobileJar = { path: image.fileName, width: image.width, height: image.height }
@@ -295,10 +304,22 @@ export default function portfolioAssets() {
       server.middlewares.use((req, res, next) => {
         const image = mobileImages.get(req.url?.split('?')[0])
         if (!image || !['GET', 'HEAD'].includes(req.method)) return next()
-        res.setHeader('Content-Type', 'image/webp')
-        res.setHeader('Content-Length', image.length)
+        const video = req.url.split('?')[0].endsWith('.mp4')
+        let start = 0, end = image.length - 1
+        if (req.headers.range) {
+          const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range)
+          if (!range || (!range[1] && !range[2])) { res.writeHead(416, { 'Content-Range': `bytes */${image.length}` }); return res.end() }
+          start = range[1] ? Number(range[1]) : Math.max(0, image.length - Number(range[2]))
+          end = range[1] && range[2] ? Math.min(end, Number(range[2])) : end
+          if (start > end || start >= image.length) { res.writeHead(416, { 'Content-Range': `bytes */${image.length}` }); return res.end() }
+          res.statusCode = 206
+          res.setHeader('Content-Range', `bytes ${start}-${end}/${image.length}`)
+        }
+        res.setHeader('Content-Type', video ? 'video/mp4' : 'image/webp')
+        res.setHeader('Accept-Ranges', 'bytes')
+        res.setHeader('Content-Length', end - start + 1)
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
-        res.end(req.method === 'HEAD' ? undefined : image)
+        res.end(req.method === 'HEAD' ? undefined : image.subarray(start, end + 1))
       })
       server.middlewares.use(servePortfolioAssets(assetsRoot, base))
       server.watcher.add(assetsRoot)

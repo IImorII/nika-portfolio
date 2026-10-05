@@ -98,3 +98,42 @@ test('inactive gallery videos keep their preview without starting a download', (
   assert.equal(f.node.src, undefined)
   cleanups.forEach(cleanup => cleanup?.())
 })
+
+test('mobile gallery downloads only the small image; fullscreen and desktop use the original', () => {
+  const item = { ...media, mobilePath: 'mobile-media/small.webp' }
+  for (const [mobilePreview, expected] of [[true, '/mobile-media/small.webp'], [false, '/work.jpg']]) {
+    const f = element()
+    react.setRef(f.node)
+    const rendered = Image({ media: item, label: 'Work', mobilePreview })
+    assert.equal(rendered.props.children[1].props.src, expected)
+    const cleanup = react.effects[0]()
+    assert.equal(f.node.src, expected)
+    cleanup()
+  }
+})
+
+test('mobile gallery plays the low resolution MP4; fullscreen plays the original MP4', () => {
+  const item = { ...media, path: 'work.mp4', mobilePath: 'mobile-media/small.mp4' }
+  for (const [mobilePreview, expected] of [[true, '/mobile-media/small.mp4'], [false, '/work.mp4']]) {
+    const f = element()
+    react.setRef(f.node)
+    const rendered = Video({ media: item, label: 'Work', mobilePreview })
+    assert.equal(rendered.props.children[1].type, 'video')
+    const cleanups = react.effects.map(effect => effect())
+    assert.equal(f.node.src, expected)
+    assert.ok(f.calls.includes('play'))
+    cleanups.forEach(cleanup => cleanup?.())
+  }
+})
+
+test('missing mobile derivatives never silently download the original', () => {
+  for (const Component of [Image, Video]) {
+    const f = element()
+    react.setRef(f.node)
+    Component({ media, label: 'Work', mobilePreview: true })
+    const cleanups = react.effects.map(effect => effect())
+    assert.ok(!f.node.src)
+    assert.ok(!f.calls.includes('play'))
+    cleanups.forEach(cleanup => cleanup?.())
+  }
+})
