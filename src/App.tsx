@@ -12,6 +12,7 @@ import CategoryLabel from './components/CategoryLabel'
 import ThemeToggle from './components/ThemeToggle'
 import SixSevenEffect from './components/SixSevenEffect'
 import type { ReservedArea } from './components/SixSevenEffect'
+import { trackPortfolioEvent } from './analytics'
 
 type Flight = { project: Category; rect: DOMRect; phase: 'ready' | 'out' | 'return-ready' | 'return' }
 type JarEffect = { id: string; phase: 'shake' | 'shatter' | 'shattered' | 'reassemble' }
@@ -32,6 +33,11 @@ export default function App() {
     try { localStorage.setItem('veronica-theme', darkTheme ? 'dark' : 'light') } catch { /* Theme still works when storage is unavailable. */ }
   }, [darkTheme])
   const [cvOpen, setCvOpen] = useState(false)
+  const aboutWasOpen = useRef(false)
+  useEffect(() => {
+    if (cvOpen && !aboutWasOpen.current) trackPortfolioEvent('about_view')
+    aboutWasOpen.current = cvOpen
+  }, [cvOpen])
   const [hoveredCategory, setHoveredCategory] = useState<Category | null>(null)
   const [sixSevenReservedAreas, setSixSevenReservedAreas] = useState<ReservedArea[]>([])
   const onCategoryHover = useCallback((category: Category, active: boolean) => {

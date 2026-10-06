@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test scripts/portfolio-assets.test.mjs scripts/media-dimensions.test.mjs scripts/mobile-media.test.mjs scripts/mobile-jars.test.mjs scripts/work-layout.test.mjs scripts/jar-geometry.test.mjs scripts/swipe-navigation.test.mjs scripts/wheel-navigation.test.mjs scripts/project-navigation.test.mjs scripts/progressive-media.test.mjs tools/jar-contour-editor/server.test.mjs",
+    "test": "node --test scripts/analytics.test.mjs scripts/portfolio-assets.test.mjs scripts/media-dimensions.test.mjs scripts/mobile-media.test.mjs scripts/mobile-jars.test.mjs scripts/work-layout.test.mjs scripts/jar-geometry.test.mjs scripts/swipe-navigation.test.mjs scripts/wheel-navigation.test.mjs scripts/project-navigation.test.mjs scripts/progressive-media.test.mjs tools/jar-contour-editor/server.test.mjs",
     "jar-editor": "node tools/jar-contour-editor/server.mjs",
     "dev": "node scripts/dev.mjs",
     "dev:vite": "vite --configLoader runner --host 127.0.0.1",

@@ -11,6 +11,7 @@ import ScrollableNavigation from './ScrollableNavigation'
 import ProgressiveImage from './ProgressiveImage'
 import ProgressiveVideo from './ProgressiveVideo'
 import SwipeTransition from './SwipeTransition'
+import { trackPortfolioEvent } from '../analytics'
 
 function ProjectCopyright({ copyright }: { copyright: PortfolioProject['copyright'] }) {
   if (!copyright?.text.trim()) return null
@@ -36,6 +37,23 @@ export default function ProjectView({ project: initialCategory, closing, instant
   const allMedia = project?.media ?? []
   const current = selected === null ? null : allMedia[selected]
   const viewerOpen = selected !== null
+  const lastCategoryView = useRef<string | null>(null)
+  const lastProjectView = useRef<string | null>(null)
+  useEffect(() => {
+    if (closing) return
+    if (lastCategoryView.current !== category.id) {
+      trackPortfolioEvent('category_view', { category_id: category.id, category_name: category.title })
+      lastCategoryView.current = category.id
+    }
+    const projectKey = project ? `${category.id}/${project.id}` : null
+    if (project && lastProjectView.current !== projectKey) {
+      trackPortfolioEvent('project_view', {
+        category_id: category.id, category_name: category.title,
+        project_id: project.id, project_name: project.title,
+      })
+    }
+    lastProjectView.current = projectKey
+  }, [category.id, category.title, project?.id, project?.title, closing])
   const sectionCounts = useMemo(() => categories.map(item => item.projects.map(project => project.sections.length)), [])
   const canNavigate = sectionCounts.flat().reduce((total, count) => total + count, 0) > 1
   const canNavigateMedia = categories.reduce((total, item) => total + item.projects.reduce((count, project) => count + project.media.length, 0), 0) > 1
