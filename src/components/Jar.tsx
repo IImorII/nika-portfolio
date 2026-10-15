@@ -2,45 +2,16 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent, RefObject } from 'react'
 import type { JarConfig, Category } from '../data'
 import { blueberryUrl, blueberrySplashUrl } from '../data'
-import { bodyAt, particleContourForZone, particleRandom, traceGlassPixels } from '../jar-geometry'
-import type { BodyContour, GlassPolygon } from '../jar-geometry'
-import { berryCount, createBerryWorld, stepBerryWorld } from '../berry-physics'
+import { bodyAt, particleContourForZone, particleRandom } from '../jar-geometry'
+import type { BodyContour } from '../jar-geometry'
+import { stepBerryWorld } from '../berry-physics'
 import type { BerryWorld } from '../berry-physics'
 import { createParticleWorld, stepParticleWorld } from '../particle-physics'
+import { subscribeAnimation } from '../animation-clock'
 
 type Stroke = { x: number; y: number }
 type JarProps = { jar: JarConfig; project: Category; paused: boolean; effect: 'shake' | 'shatter' | 'shattered' | 'reassemble' | null; onOpen: (project: Category, berry: DOMRect) => void; onEraser: (active: boolean) => void; onPairHover: (active: boolean) => void; onCategoryHover: (category: Category, active: boolean) => void }
 type Point = { x: number; y: number }
-
-// The cloth covers the neck, so only the visible glass body belongs to the light layer.
-function traceBody(image: HTMLImageElement, glass?: GlassPolygon): BodyContour | null {
-  const width = image.naturalWidth
-  const height = image.naturalHeight
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const context = canvas.getContext('2d', { willReadFrequently: true })
-  if (!context) return null
-  context.drawImage(image, 0, 0)
-  const pixels = context.getImageData(0, 0, width, height).data
-  return traceGlassPixels(pixels, width, height, glass)
-}
-
-async function foregroundPixels(jar: JarConfig, contour: BodyContour) {
-  const images = await Promise.all(jar.layers.filter(layer => layer.placement !== 'interior').map(layer => new Promise<HTMLImageElement | null>(resolve => {
-    const image = new Image()
-    image.onload = () => resolve(image)
-    image.onerror = () => resolve(null)
-    image.src = layer.image
-  })))
-  const canvas = document.createElement('canvas')
-  canvas.width = contour.width
-  canvas.height = contour.height
-  const context = canvas.getContext('2d', { willReadFrequently: true })
-  if (!context) return new Uint8ClampedArray(contour.width * contour.height * 4)
-  for (const image of images) if (image) context.drawImage(image, 0, 0)
-  return context.getImageData(0, 0, contour.width, contour.height).data
-}
 
 function GlowGradient({ id, color = '#ff8b10' }: { id: string; color?: string }) {
   const amber = color.toLowerCase() === '#ff8b10'
@@ -114,8 +85,7 @@ function JarFragments({ jar, effect }: { jar: JarConfig; effect: NonNullable<Jar
         '--fragment-delay': `${(index % 7) * 11}ms`,
       } as CSSProperties
       return <span key={index} className="jar-fragment" style={style}>
-        <img src={jar.image} alt="" draggable="false" />
-        {jar.layers.map(layer => <img key={layer.image} src={layer.image} alt="" draggable="false" style={{ mixBlendMode: layer.blendMode }} />)}
+        <img src={jar.wholeImage} alt="" draggable="false" />
       </span>
     })}
   </span>
@@ -186,30 +156,13 @@ function GlowParticles({ id, count, seed, size, color, contour, paused }: { id: 
   const circles = useRef<(SVGCircleElement | null)[]>([])
   useEffect(() => {
     if (paused || !world.particles.length) return
-    const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
-    let frame = 0, previous = 0
-    const animate = (time: number) => {
-      if (previous) stepParticleWorld(world, (time - previous) / 1000)
-      previous = time
+    return subscribeAnimation(seconds => {
+      stepParticleWorld(world, seconds)
       world.particles.forEach((particle, i) => {
         circles.current[i]?.setAttribute('cx', String(particle.x))
         circles.current[i]?.setAttribute('cy', String(particle.y))
       })
-      frame = requestAnimationFrame(animate)
-    }
-    const update = () => {
-      cancelAnimationFrame(frame)
-      previous = 0
-      if (!preference.matches && !document.hidden) frame = requestAnimationFrame(animate)
-    }
-    update()
-    preference.addEventListener('change', update)
-    document.addEventListener('visibilitychange', update)
-    return () => {
-      cancelAnimationFrame(frame)
-      preference.removeEventListener('change', update)
-      document.removeEventListener('visibilitychange', update)
-    }
+    })
   }, [world, paused])
   return <g className="glow-particles">
     <defs><GlowGradient id={id + '-glow'} color={color} /></defs>
@@ -255,79 +208,63 @@ export default function Jar({ jar, project, paused, effect, onOpen, onEraser, on
   const press = useRef({ x: 0, y: 0, active: false, held: false, moved: false })
   const mode = useRef<'idle' | 'erasing' | 'restoring'>('idle')
   const [strokes, setStrokes] = useState<Stroke[]>([])
-  const [contour, setContour] = useState<BodyContour | null>(null)
-  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null)
+  const contour = jar.desktop.contour
+  const imageSize = jar.desktop
   const particleContour = useMemo(() => jar.particleZone ? (imageSize ? particleContourForZone(imageSize, jar.particleZone) : null) : contour, [contour, imageSize, jar.particleZone])
-  const [berryWorld, setBerryWorld] = useState<BerryWorld | null>(null)
-  const [tick, setTick] = useState(0)
+  const berryWorld = useMemo<BerryWorld | null>(() => jar.desktop.berries ? structuredClone(jar.desktop.berries) : null, [jar.desktop])
+  const [dustActive, setDustActive] = useState(false)
+  const dustTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [visible, setVisible] = useState(true)
+  const animationPaused = paused || !visible
+  const showDust = () => { if (dustTimer.current) clearTimeout(dustTimer.current); setDustActive(true) }
+  const hideDust = () => {
+    if (dustTimer.current) clearTimeout(dustTimer.current)
+    dustTimer.current = setTimeout(() => setDustActive(false), 1350)
+  }
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting))
+    if (buttonRef.current) observer.observe(buttonRef.current)
+    return () => { observer.disconnect(); if (dustTimer.current) clearTimeout(dustTimer.current) }
+  }, [])
+  const [restoring, setRestoring] = useState(false)
+  const eraseCircles = useRef<(SVGCircleElement | null)[]>([])
   const releaseAt = useRef(0)
   const maskId = jar.id + '-erase'
 
   useEffect(() => {
-    let active = true
-    setBerryWorld(null)
-    if (contour) void foregroundPixels(jar, contour).then(pixels => {
-      if (!active) return
-      const world = createBerryWorld(contour, pixels, jar.seed, { count: jar.blueberryCount, size: jar.blueberrySize })
-      const requestedCount = jar.blueberryCount ?? berryCount(contour)
-      if (world.berries.length < requestedCount) console.warn(`${jar.categoryId}/jar/settings.json: only ${world.berries.length} of ${requestedCount} blueberries fit at the configured size. Reduce blueberrySize or blueberryCount.`)
-      setBerryWorld(world)
-    })
-    return () => { active = false }
-  }, [jar, contour])
-
-  useEffect(() => {
-    if (!berryWorld || effect || paused) return
-    const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
-    let frame = 0
-    let previous = 0
-    const animate = (time: number) => {
-      if (previous) stepBerryWorld(berryWorld, (time - previous) / 1000)
-      previous = time
+    if (!berryWorld?.berries.length || effect || animationPaused) return
+    return subscribeAnimation(seconds => {
+      stepBerryWorld(berryWorld, seconds)
       berryWorld.berries.forEach((berry, index) => {
         const image = berryRefs.current[index]
         image?.setAttribute('x', String(berry.x - berry.radius))
         image?.setAttribute('y', String(berry.y - berry.radius))
         image?.setAttribute('transform', `rotate(${berry.rotation} ${berry.x} ${berry.y})`)
       })
-      frame = requestAnimationFrame(animate)
-    }
-    const update = () => {
-      cancelAnimationFrame(frame)
-      previous = 0
-      if (!preference.matches && !document.hidden) frame = requestAnimationFrame(animate)
-    }
-    update()
-    preference.addEventListener('change', update)
-    document.addEventListener('visibilitychange', update)
-    return () => {
-      cancelAnimationFrame(frame)
-      preference.removeEventListener('change', update)
-      document.removeEventListener('visibilitychange', update)
-    }
-  }, [berryWorld, effect, paused])
+    })
+  }, [berryWorld, effect, animationPaused])
 
   const beginRestore = () => {
     if (mode.current !== 'erasing') return
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { mode.current = 'idle'; setStrokes([]); onEraser(false); if (maxTimer.current) clearTimeout(maxTimer.current); return }
     mode.current = 'restoring'
     releaseAt.current = performance.now()
-    setTick(1)
+    setRestoring(true)
     onEraser(false)
     if (maxTimer.current) clearTimeout(maxTimer.current)
   }
 
   useEffect(() => {
-    if (mode.current !== 'restoring') return
-    let frame = 0
-    const animate = () => {
+    if (!restoring || !particleContour) return
+    const finish = () => { mode.current = 'idle'; setStrokes([]); setRestoring(false) }
+    const timer = setTimeout(finish, Math.max(0, 1800 - (performance.now() - releaseAt.current)))
+    const unsubscribe = subscribeAnimation(() => {
       const elapsed = performance.now() - releaseAt.current
-      setTick(elapsed)
-      if (elapsed < 1800) frame = requestAnimationFrame(animate)
-      else { mode.current = 'idle'; setStrokes([]) }
-    }
-    frame = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(frame)
-  }, [strokes.length, tick === 0])
+      const radius = particleContour.width * 25 / 180 * Math.max(0, 1 - elapsed / 1800)
+      for (const circle of eraseCircles.current) circle?.setAttribute('r', String(radius))
+    })
+    return () => { clearTimeout(timer); unsubscribe() }
+  }, [restoring, particleContour])
 
   useEffect(() => () => {
     if (holdTimer.current) clearTimeout(holdTimer.current)
@@ -336,10 +273,10 @@ export default function Jar({ jar, project, paused, effect, onOpen, onEraser, on
   }, [onEraser])
 
   useEffect(() => {
-    if (!particleContour || !svgRef.current) return
+    if (!svgRef.current) return
     const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
     const updateMotion = () => {
-      if (motionPreference.matches || paused) {
+      if (motionPreference.matches || animationPaused || document.hidden) {
         svgRef.current?.pauseAnimations()
         dustSvgRef.current?.pauseAnimations()
       } else {
@@ -349,8 +286,9 @@ export default function Jar({ jar, project, paused, effect, onOpen, onEraser, on
     }
     updateMotion()
     motionPreference.addEventListener('change', updateMotion)
-    return () => motionPreference.removeEventListener('change', updateMotion)
-  }, [particleContour, berryWorld, paused])
+    document.addEventListener('visibilitychange', updateMotion)
+    return () => { motionPreference.removeEventListener('change', updateMotion); document.removeEventListener('visibilitychange', updateMotion) }
+  }, [particleContour, animationPaused, dustActive])
 
   const addStroke = (event: PointerEvent<HTMLButtonElement>) => {
     if (mode.current !== 'erasing' || !svgRef.current || !particleContour) return
@@ -413,37 +351,35 @@ export default function Jar({ jar, project, paused, effect, onOpen, onEraser, on
     if (shouldOpen) openFromBerry()
   }
 
-  const restoreProgress = mode.current === 'restoring' ? Math.max(0, 1 - tick / 1800) : 1
-  const style = { '--x': jar.x + '%', '--y': jar.y + '%', '--mx': jar.mobileX + '%', '--my': jar.mobileY + '%', '--rotation': jar.rotation + 'deg', '--scale': jar.scale, '--ambient-delay': (-jar.seed / 7) + 's' } as CSSProperties
+  const style = { '--x': jar.x + '%', '--y': jar.y + '%', '--mx': jar.mobileX + '%', '--my': jar.mobileY + '%', '--rotation': jar.rotation + 'deg', '--scale': jar.scale, '--ambient-delay': (-jar.seed / 7) + 's', '--jar-aspect': jar.desktop.width / jar.desktop.height } as CSSProperties
 
-  return <button ref={buttonRef} className={'jar-button' + (effect && effect !== 'shake' ? ' jar-effect-active' : '') + (effect === 'shake' ? ' jar-shaking' : '') + (effect === 'reassemble' ? ' jar-reassembling' : '')} style={style} type="button" aria-label={'Open ' + project.title + '. Press and hold to erase the light inside.'} data-interactive="true" data-jar-number={project.number} onPointerEnter={event => { if (event.pointerType === 'touch') return; onCategoryHover(project, true); if (project.number === '06' || project.number === '07') onPairHover(true) }} onPointerLeave={event => { if (!event.currentTarget.matches(':focus-visible')) onCategoryHover(project, false); if (project.number === '06' || project.number === '07') onPairHover(false) }} onFocus={event => { if (!event.currentTarget.matches(':focus-visible')) return; onCategoryHover(project, true); if (project.number === '06' || project.number === '07') onPairHover(true) }} onBlur={event => { if (!event.currentTarget.matches(':hover')) onCategoryHover(project, false); if (project.number === '06' || project.number === '07') onPairHover(false) }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { press.current.active = false; if (holdTimer.current) clearTimeout(holdTimer.current); beginRestore() }} onClick={event => { if (event.detail === 0) openFromBerry() }}>
+  return <button ref={buttonRef} className={'jar-button' + (animationPaused ? ' jar-paused' : '') + (effect && effect !== 'shake' ? ' jar-effect-active' : '') + (effect === 'shake' ? ' jar-shaking' : '') + (effect === 'reassemble' ? ' jar-reassembling' : '')} style={style} type="button" aria-label={'Open ' + project.title + '. Press and hold to erase the light inside.'} data-interactive="true" data-jar-number={project.number} onPointerEnter={event => { if (event.pointerType === 'touch') return; showDust(); onCategoryHover(project, true); if (project.number === '06' || project.number === '07') onPairHover(true) }} onPointerLeave={event => { if (!event.currentTarget.matches(':focus-visible')) { hideDust(); onCategoryHover(project, false) }; if (project.number === '06' || project.number === '07') onPairHover(false) }} onFocus={event => { if (!event.currentTarget.matches(':focus-visible')) return; showDust(); onCategoryHover(project, true); if (project.number === '06' || project.number === '07') onPairHover(true) }} onBlur={event => { if (!event.currentTarget.matches(':hover')) { hideDust(); onCategoryHover(project, false) }; if (project.number === '06' || project.number === '07') onPairHover(false) }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { press.current.active = false; if (holdTimer.current) clearTimeout(holdTimer.current); beginRestore() }} onClick={event => { if (event.detail === 0) openFromBerry() }}>
     <span className="jar-float">
       <span className="jar-body">
-        <img className="jar-photo" src={jar.image} alt="" draggable="false" onLoad={event => { const image = event.currentTarget; image.closest('button')?.style.setProperty('--jar-aspect', String(image.naturalWidth / image.naturalHeight)); setImageSize({ width: image.naturalWidth, height: image.naturalHeight }); setContour(traceBody(image, jar.glassPolygon)) }} />
-        {jar.layers.filter(layer => layer.placement === 'interior').map(layer => <img key={layer.image} className="jar-overlay jar-interior" src={layer.image} alt="" draggable="false" style={{ mixBlendMode: layer.blendMode }} />)}
-        {particleContour && <svg ref={svgRef} className="jar-light-layer" viewBox={`0 0 ${particleContour.width} ${particleContour.height}`} aria-hidden="true">
+        <img className="jar-photo" src={jar.image} width={jar.desktop.width} height={jar.desktop.height} alt="" draggable="false" decoding="async" />
+        {(particleContour || contour) && <svg ref={svgRef} className="jar-light-layer" viewBox={`0 0 ${jar.desktop.width} ${jar.desktop.height}`} aria-hidden="true">
           <defs>
-            <clipPath id={jar.id + '-body'} clipPathUnits="userSpaceOnUse"><path d={particleContour.path} /></clipPath>
-            <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={particleContour.width} height={particleContour.height}>
+            {particleContour && <clipPath id={jar.id + '-body'} clipPathUnits="userSpaceOnUse"><path d={particleContour.path} /></clipPath>}
+            {particleContour && <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={particleContour.width} height={particleContour.height}>
               <rect width={particleContour.width} height={particleContour.height} fill="white" />
-              {strokes.map((stroke, i) => <circle key={i} cx={stroke.x} cy={stroke.y} r={particleContour.width * 25 / 180 * restoreProgress} fill="black" />)}
-            </mask>
+              {strokes.map((stroke, i) => <circle key={i} ref={circle => { eraseCircles.current[i] = circle }} cx={stroke.x} cy={stroke.y} r={particleContour.width * 25 / 180} fill="black" />)}
+            </mask>}
           </defs>
-          <g clipPath={'url(#' + jar.id + '-body)'}>
-            <g className="jar-glow-content" mask={'url(#' + maskId + ')'}><GlowParticles id={jar.id} count={jar.particleCount} seed={jar.seed} size={jar.particleSize} color={jar.particleColor} contour={particleContour} paused={paused || !!effect} /></g>
-          </g>
-        </svg>}
-        {contour && <svg className="jar-berry-layer" viewBox={`0 0 ${contour.width} ${contour.height}`} aria-hidden="true">
+          {particleContour && <g clipPath={'url(#' + jar.id + '-body)'}>
+            <g className="jar-glow-content" mask={strokes.length ? 'url(#' + maskId + ')' : undefined}><GlowParticles id={jar.id} count={jar.particleCount} seed={jar.seed} size={jar.particleSize} color={jar.particleColor} contour={particleContour} paused={animationPaused || !!effect} /></g>
+          </g>}
+          {contour && <g className="jar-berry-layer">
           <defs><clipPath id={jar.id + '-berry-body'} clipPathUnits="userSpaceOnUse"><path d={contour.path} /></clipPath></defs>
           <g clipPath={'url(#' + jar.id + '-berry-body)'}>
             {berryWorld?.berries.map((berry, index) => <image key={index} ref={image => { berryRefs.current[index] = image; if (index === 0) berryRef.current = image }} className="jar-blueberry" href={blueberryUrl} x={berry.x - berry.radius} y={berry.y - berry.radius} width={berry.radius * 2} height={berry.radius * 2} transform={`rotate(${berry.rotation} ${berry.x} ${berry.y})`} />)}
           </g>
+          </g>}
         </svg>}
-        {jar.layers.filter(layer => layer.placement !== 'interior').map(layer => <img key={layer.image} className="jar-overlay" src={layer.image} alt="" draggable="false" style={{ mixBlendMode: layer.blendMode }} />)}
+        <img className="jar-overlay" src={jar.foreground} width={jar.desktop.width} height={jar.desktop.height} alt="" draggable="false" decoding="async" />
         {effect && effect !== 'shake' && <JarFragments jar={jar} effect={effect} />}
         {effect && effect !== 'shake' && <JarBurst jar={jar} effect={effect} />}
       </span>
-      {contour && !paused && <MagicDust id={jar.id} seed={jar.seed} contour={contour} svgRef={dustSvgRef} />}
+      {contour && !animationPaused && !effect && dustActive && <MagicDust id={jar.id} seed={jar.seed} contour={contour} svgRef={dustSvgRef} />}
     </span>
     <span className={'jar-index-anchor' + (jar.indexAnchor ? ' jar-index-anchor-custom' : '')} style={jar.indexAnchor ? { left: `${jar.indexAnchor.x}%`, top: `${jar.indexAnchor.y}%` } : undefined} aria-hidden="true">{project.number}</span>
   </button>

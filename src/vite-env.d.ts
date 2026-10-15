@@ -9,6 +9,7 @@ declare module 'virtual:portfolio-assets' {
     id: string
     title: string
     jarPath: string
+    desktopJar: import('./data').Category['desktopJar']
     mobileJar?: import('./data').Category['mobileJar']
     jarLayers: import('./data').Category['jarLayers']
     glassPolygon?: import('./data').Category['glassPolygon']

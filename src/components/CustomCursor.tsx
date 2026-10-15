@@ -17,18 +17,22 @@ export default function CustomCursor({ erasing }: { erasing: boolean }) {
       }
       element.classList.add('cursor-visible')
       element.classList.toggle('cursor-active', !!(event.target as Element)?.closest('[data-interactive]'))
+      if (!frame) frame = requestAnimationFrame(animate)
     }
-    const leave = () => element.classList.remove('cursor-visible')
+    const leave = () => { element.classList.remove('cursor-visible'); cancelAnimationFrame(frame); frame = 0 }
     const animate = () => {
+      frame = 0
       x += (targetX - x) * .28
       y += (targetY - y) * .28
+      const moving = Math.abs(targetX - x) + Math.abs(targetY - y) > .1
+      if (!moving) { x = targetX; y = targetY }
       element.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`
-      frame = requestAnimationFrame(animate)
+      if (moving && !document.hidden) frame = requestAnimationFrame(animate)
     }
     window.addEventListener('mousemove', move)
     document.addEventListener('mouseleave', leave)
-    frame = requestAnimationFrame(animate)
-    return () => { window.removeEventListener('mousemove', move); document.removeEventListener('mouseleave', leave); cancelAnimationFrame(frame) }
+    document.addEventListener('visibilitychange', leave)
+    return () => { window.removeEventListener('mousemove', move); document.removeEventListener('mouseleave', leave); document.removeEventListener('visibilitychange', leave); cancelAnimationFrame(frame) }
   }, [])
   return <div ref={cursor} className={`custom-cursor ${erasing ? 'cursor-eraser' : ''}`} aria-hidden="true"><span /></div>
 }

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, existsSync, statSync, createReadStream, open
 import { pipeline } from 'node:stream'
 import path from 'node:path'
 import { createMobileJar } from './mobile-jars.mjs'
+import { createDesktopJar } from './desktop-jars.mjs'
 import { createMobileMedia } from './mobile-media.mjs'
 import { readMediaDimensions, readImagePreview, readVideoPreview } from './media-dimensions.mjs'
 
@@ -290,6 +291,15 @@ export default function portfolioAssets() {
         else this.emitFile({ type: 'asset', fileName: mobile.fileName, source: mobile.source })
       } })
       for (const [index, category] of catalog.categories.entries()) {
+        const desktop = await createDesktopJar(assetsRoot, category, index)
+        const requested = category.jarSettings.blueberryCount
+        if (requested != null && desktop.berries && desktop.berries.berries.length < requested) this.warn(`${category.id}/jar/settings.json: only ${desktop.berries.berries.length} of ${requested} blueberries fit. Reduce blueberrySize or blueberryCount.`)
+        category.desktopJar = { lower: desktop.files[0].fileName, upper: desktop.files[1].fileName, whole: desktop.files[2].fileName,
+          width: desktop.width, height: desktop.height, contour: desktop.contour, berries: desktop.berries }
+        for (const file of desktop.files) {
+          if (development) mobileImages.set(base + file.fileName, file.source)
+          else this.emitFile({ type: 'asset', fileName: file.fileName, source: file.source })
+        }
         const image = await createMobileJar(assetsRoot, category, index)
         category.mobileJar = { path: image.fileName, width: image.width, height: image.height }
         if (development) mobileImages.set(base + image.fileName, image.source)

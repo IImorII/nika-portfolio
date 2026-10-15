@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import ts from 'typescript'
 
+const pageEvents = new EventTarget()
+globalThis.document = Object.assign(pageEvents, { hidden: false })
+
 const moduleUrl = source => 'data:text/javascript;base64,' + Buffer.from(source).toString('base64')
 const reactUrl = moduleUrl(`
   export const effects = [], updates = [];
@@ -97,6 +100,25 @@ test('inactive gallery videos keep their preview without starting a download', (
   assert.equal(f.calls.includes('play'), false)
   assert.equal(f.node.src, undefined)
   cleanups.forEach(cleanup => cleanup?.())
+})
+
+test('hidden tabs pause video and resume the same source without reloading', () => {
+  const f = element()
+  react.setRef(f.node)
+  Video({ media: { ...media, path: 'work.mp4' }, label: 'Work' })
+  const cleanups = react.effects.map(effect => effect())
+  document.hidden = true
+  document.dispatchEvent(new Event('visibilitychange'))
+  assert.equal(f.calls.at(-1), 'pause')
+  assert.equal(f.node.src, '/work.mp4')
+  document.hidden = false
+  document.dispatchEvent(new Event('visibilitychange'))
+  assert.equal(f.calls.at(-1), 'play')
+  assert.ok(!f.calls.includes('load'))
+  cleanups.forEach(cleanup => cleanup?.())
+  const count = f.calls.length
+  document.dispatchEvent(new Event('visibilitychange'))
+  assert.equal(f.calls.length, count, 'unmounted video releases its page listener')
 })
 
 test('mobile gallery downloads only the small image; fullscreen and desktop use the original', () => {

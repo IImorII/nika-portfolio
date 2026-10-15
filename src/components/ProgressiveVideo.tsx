@@ -32,13 +32,19 @@ export default function ProgressiveVideo({ media, label, playing = true, mobileP
     if (!video) return
     if (playing && src) {
       video.src = src
-      void video.play().catch(() => {})
+      if (!document.hidden) void video.play().catch(() => {})
     } else {
       video.pause()
       video.removeAttribute('src')
       video.load()
     }
+    const updateVisibility = () => {
+      if (document.hidden) video.pause()
+      else if (playing && src) void video.play().catch(() => {})
+    }
+    document.addEventListener('visibilitychange', updateVisibility)
     return () => {
+      document.removeEventListener('visibilitychange', updateVisibility)
       video.pause()
       video.removeAttribute('src')
       video.load()

@@ -8,6 +8,11 @@ import { scanPortfolio } from './portfolio-assets.mjs'
 import ts from 'typescript'
 
 async function jarData(catalog) {
+  // The Vite plugin enriches the scanner output with generated desktop assets.
+  catalog = catalog.map(category => ({ ...category, desktopJar: {
+    lower: `desktop-jars/${category.id}-lower.webp`, upper: `desktop-jars/${category.id}-upper.webp`, whole: `desktop-jars/${category.id}-whole.webp`,
+    width: 1024, height: 1024, contour: null, berries: null,
+  } }))
   const source = readFileSync(new URL('../src/data.ts', import.meta.url), 'utf8')
     .replace("import catalog from 'virtual:portfolio-assets'", `const catalog = ${JSON.stringify(catalog)}`)
     .replace('import.meta.env.BASE_URL', "'/repo/'")
@@ -296,6 +301,9 @@ test('interior placement and PSD blend modes reach jar rendering data; legacy la
     { placement: 'foreground', blendMode: 'luminosity' },
     { placement: undefined, blendMode: 'normal' },
   ])
+  assert.equal(jars[0].image, '/repo/desktop-jars/print-lower.webp')
+  assert.equal(jars[0].foreground, '/repo/desktop-jars/print-upper.webp')
+  assert.equal(jars[0].wholeImage, '/repo/desktop-jars/print-whole.webp')
   writeFileSync(manifest, JSON.stringify({ layers: [{ file: 'layer_1.webp', placement: 'unknown' }] }))
   const fallback = scanPortfolio(root)
   assert.match(fallback.warnings[0], /unsupported placement/)

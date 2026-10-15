@@ -39,6 +39,7 @@ export interface Category {
   number: string
   title: string
   jarPath: string
+  desktopJar: { lower: string; upper: string; whole: string; width: number; height: number; contour: import('./jar-geometry').BodyContour | null; berries: import('./berry-physics').BerryWorld | null }
   mobileJar?: { path: string; width: number; height: number }
   jarLayers: { path: string; blendMode: 'normal' | 'multiply' | 'lighten' | 'luminosity' | 'color-burn'; placement?: 'interior' | 'foreground' }[]
   glassPolygon?: import('./jar-geometry').GlassPolygon
@@ -50,6 +51,9 @@ export interface JarConfig {
   id: string
   categoryId: string
   image: string
+  desktop: Category['desktopJar']
+  foreground: string
+  wholeImage: string
   mobileImage?: { image: string; width: number; height: number }
   layers: { image: string; blendMode: 'normal' | 'multiply' | 'lighten' | 'luminosity' | 'color-burn'; placement?: 'interior' | 'foreground' }[]
   glassPolygon?: import('./jar-geometry').GlassPolygon
@@ -104,7 +108,8 @@ export const jars: JarConfig[] = categories.map((category, index) => {
   const mobile = position(index, mobileRows, true)
   const settings = category.jarSettings
   return {
-    id: `jar-${category.number}`, categoryId: category.id, image: assetUrl(category.jarPath),
+    id: `jar-${category.number}`, categoryId: category.id, image: assetUrl(category.desktopJar.lower),
+    foreground: assetUrl(category.desktopJar.upper), wholeImage: assetUrl(category.desktopJar.whole), desktop: category.desktopJar,
     mobileImage: category.mobileJar ? { image: assetUrl(category.mobileJar.path), width: category.mobileJar.width, height: category.mobileJar.height } : undefined,
     layers: category.jarLayers.map(layer => ({ image: assetUrl(layer.path), blendMode: layer.blendMode, placement: layer.placement })),
     glassPolygon: category.glassPolygon,

@@ -12,9 +12,9 @@ button:focus-visible{outline:2px solid var(--foreground);outline-offset:5px}
 .site-shell{height:100svh;min-height:650px;display:flex;flex-direction:column;overflow:hidden;position:relative;background:var(--page-background);transition:background-color .4s ease}
 .color-reveal{position:absolute;inset:0;clip-path:circle(0 at var(--reveal-x) var(--reveal-y));transition:clip-path 1s linear;pointer-events:none}
 .color-reveal{z-index:2;background:var(--reveal-background);transition:clip-path 1s linear,background-color .4s ease}
-.jar-indices{position:absolute;inset:0;z-index:8;pointer-events:none;mix-blend-mode:difference}
+.jar-indices{position:absolute;inset:0;pointer-events:none}
 .jar-index,.jar-index-anchor{font-family:Helvetica,sans-serif;font-size:9px;font-weight:800;letter-spacing:.09em;line-height:normal}
-.jar-index{position:absolute;transform:translate(-50%,-50%)}
+.jar-index{position:absolute;z-index:8;mix-blend-mode:difference;transform:translate(-50%,-50%)}
 .site-shell.is-inverted .color-reveal{clip-path:circle(var(--reveal-radius) at var(--reveal-x) var(--reveal-y))}
 .site-header,.site-footer{position:relative;z-index:12;display:flex;align-items:center;justify-content:space-between;padding:0 3.2vw;font-size:10px;font-weight:700;letter-spacing:.12em;line-height:1.2}
 .site-header{color:#fff;z-index:auto}.site-header .about-button{position:relative;z-index:12}.site-header .about-button,.site-footer{color:#fff;mix-blend-mode:difference}
@@ -84,9 +84,10 @@ button:focus-visible{outline:2px solid var(--foreground);outline-offset:5px}
 .jar-burst-mist i:nth-child(3){inset:8% 17% 10% -8%;--mist-x:-18%;--mist-y:8%;animation-delay:65ms}
 @keyframes jar-mist-burst{0%{opacity:0;transform:translate(0,0) scale(.3)}18%{opacity:.9}45%{opacity:.65}100%{opacity:0;transform:translate(var(--mist-x,0%),var(--mist-y,-8%)) scale(1.35)}}
 @media(prefers-reduced-motion:reduce){.jar-burst{display:none}}
-.jar-light-layer,.jar-berry-layer{position:absolute;inset:0;display:block;width:100%;height:100%;overflow:visible;pointer-events:none}
+.jar-light-layer{position:absolute;inset:0;display:block;width:100%;height:100%;overflow:visible;pointer-events:none}
 .jar-berry-layer{mix-blend-mode:multiply;opacity:.88}
 .jar-glow-content{opacity:.68}
+.jar-paused .jar-float,.jar-paused .glow-particle{animation-play-state:paused!important}
 .jar-index{color:#fff;white-space:nowrap}
 .jar-index-anchor{position:absolute;bottom:12px;right:7px;visibility:hidden;pointer-events:none}
 .jar-index-anchor-custom{right:auto;bottom:auto;width:0;height:0}

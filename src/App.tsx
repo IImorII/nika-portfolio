@@ -32,6 +32,12 @@ export default function App() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', darkTheme ? '#000000' : '#ffffff')
     try { localStorage.setItem('veronica-theme', darkTheme ? 'dark' : 'light') } catch { /* Theme still works when storage is unavailable. */ }
   }, [darkTheme])
+  const [pageHidden, setPageHidden] = useState(() => document.hidden)
+  useEffect(() => {
+    const update = () => setPageHidden(document.hidden)
+    document.addEventListener('visibilitychange', update)
+    return () => document.removeEventListener('visibilitychange', update)
+  }, [])
   const [cvOpen, setCvOpen] = useState(false)
   const aboutWasOpen = useRef(false)
   useEffect(() => {
@@ -222,7 +228,7 @@ export default function App() {
           <VeronicaTitle titleRef={titleRef} onReveal={startReveal} onConceal={() => setInverted(false)} onOpen={() => setCvOpen(true)} />
           <div className="jar-scene">{jars.map(jar => mobileView && jar.mobileImage
             ? <MobileJar key={jar.id} jar={jar} project={categories.find(category => category.id === jar.categoryId)!} onOpen={openProject} />
-            : <Jar key={jar.id} jar={jar} project={categories.find(category => category.id === jar.categoryId)!} paused={mobileView || modalOpen} effect={jarEffect?.id === jar.categoryId ? jarEffect.phase : null} onOpen={openProject} onEraser={onEraser} onPairHover={onPairHover} onCategoryHover={onCategoryHover} />)}</div>
+            : <Jar key={jar.id} jar={jar} project={categories.find(category => category.id === jar.categoryId)!} paused={mobileView || modalOpen || pageHidden} effect={jarEffect?.id === jar.categoryId ? jarEffect.phase : null} onOpen={openProject} onEraser={onEraser} onPairHover={onPairHover} onCategoryHover={onCategoryHover} />)}</div>
           {categories.length === 0 && <p className="archive-empty">The archive is being prepared.</p>}
         </div>
       </section>
